@@ -120,8 +120,17 @@ impl RenderContext {
             self.style.color_enabled = false;
         }
         if target.is_plain() {
+            // Plain output is pipe-safe ASCII: re-resolve every
+            // symbol-dependent grammar decision. Markers and the rule
+            // character were fixed at config-resolution time and would
+            // otherwise leak Unicode structural glyphs (e.g. `» `, `─`)
+            // into output that promised ASCII. Badges and rules read
+            // `symbols` live at render time, so flipping the mode covers them.
             self.symbols = SymbolMode::Ascii;
             self.style.symbols = SymbolMode::Ascii;
+            self.style.title_marker = self.style.preset.ascii_structural_marker();
+            self.style.section_marker = self.style.preset.ascii_structural_marker();
+            self.style.rule_char = self.style.preset.rule_char(SymbolMode::Ascii);
         }
         self
     }

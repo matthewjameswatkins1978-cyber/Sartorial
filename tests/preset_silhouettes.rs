@@ -263,27 +263,18 @@ fn ascii_mode_stays_ascii() {
 }
 
 #[test]
-fn hint_renders_without_fake_keys() {
-    let bar = ActionBar::from_actions(vec![Action::hint(
-        "force",
-        "Rerun with --force to overwrite",
-    )]);
+fn real_actions_keep_key_brackets() {
+    // Every Action on the v0.1 wire carries a real trigger, so every
+    // rendered action honestly wears its key brackets. No display-only
+    // trigger exists: attach only keys the application really handles.
+    let bar = ActionBar::from_actions(vec![Action::new('r', "retry", "Retry")]);
     let ctx = ctx_no_color(Preset::House, 100);
-    let human = bar.to_human_string(&ctx).unwrap();
-    assert!(human.contains("Rerun with --force"), "got: {human}");
     assert!(
-        !human.contains('[') && !human.contains(']'),
-        "hint must not wear key brackets"
+        bar.to_human_string(&ctx).unwrap().contains("[R] Retry"),
+        "real actions keep their brackets"
     );
-    let plain = bar
-        .to_plain_string(&RenderContext::plain_preset(Preset::House))
-        .unwrap();
-    assert!(plain.contains("Rerun with --force"));
-    // Real actions keep their brackets; agent JSON keeps the hint id.
-    let real = ActionBar::from_actions(vec![Action::new('r', "retry", "Retry")]);
-    assert!(real.to_human_string(&ctx).unwrap().contains("[R] Retry"));
     let screen =
-        SummaryScreen::new("Demo", Status::Ready).action(Action::hint("next", "Do the thing"));
+        SummaryScreen::new("Demo", Status::Ready).action(Action::new('d', "next", "Do the thing"));
     assert!(screen.to_agent_json(false).unwrap().contains("\"next\""));
 }
 

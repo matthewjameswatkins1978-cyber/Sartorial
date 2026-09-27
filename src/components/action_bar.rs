@@ -40,43 +40,33 @@ impl RenderHuman for ActionBar {
         let (open_bracket, close_bracket) = ctx.style.key_delimiters();
 
         for (idx, action) in self.actions.iter().enumerate() {
-            if !action.trigger.is_interactive() {
-                // Display-only hint: guidance text, honestly bracket-free.
-                HumanRenderer::write_styled(
-                    out,
-                    ctx.style.muted_style(),
-                    &action.label,
-                    ctx.color_enabled,
-                )?;
-            } else {
-                let key_str = action.trigger.display_tag();
+            let key_str = action.trigger.display_tag();
 
-                HumanRenderer::write_styled(
-                    out,
-                    ctx.style.key_bracket_style(),
-                    open_bracket,
-                    ctx.color_enabled,
-                )?;
-                HumanRenderer::write_styled(
-                    out,
-                    ctx.style.key_char_style(),
-                    &key_str,
-                    ctx.color_enabled,
-                )?;
-                HumanRenderer::write_styled(
-                    out,
-                    ctx.style.key_bracket_style(),
-                    close_bracket,
-                    ctx.color_enabled,
-                )?;
-                write!(out, " ")?;
-                HumanRenderer::write_styled(
-                    out,
-                    ctx.style.value_style(),
-                    &action.label,
-                    ctx.color_enabled,
-                )?;
-            }
+            HumanRenderer::write_styled(
+                out,
+                ctx.style.key_bracket_style(),
+                open_bracket,
+                ctx.color_enabled,
+            )?;
+            HumanRenderer::write_styled(
+                out,
+                ctx.style.key_char_style(),
+                &key_str,
+                ctx.color_enabled,
+            )?;
+            HumanRenderer::write_styled(
+                out,
+                ctx.style.key_bracket_style(),
+                close_bracket,
+                ctx.color_enabled,
+            )?;
+            write!(out, " ")?;
+            HumanRenderer::write_styled(
+                out,
+                ctx.style.value_style(),
+                &action.label,
+                ctx.color_enabled,
+            )?;
 
             if idx < self.actions.len() - 1 {
                 write!(out, "{gap}")?;
@@ -91,17 +81,13 @@ impl RenderPlain for ActionBar {
         let gap = " ".repeat(ctx.style.action_gap(ctx.is_narrow()));
         let (open_bracket, close_bracket) = ctx.style.key_delimiters();
         for (idx, action) in self.actions.iter().enumerate() {
-            if !action.trigger.is_interactive() {
-                write!(out, "{}", action.label)?;
-            } else {
-                let key_str = action.trigger.display_tag();
-                write!(
-                    out,
-                    "{open_bracket}{key_str}{close_bracket}{}{}",
-                    if action.label.is_empty() { "" } else { " " },
-                    action.label
-                )?;
-            }
+            let key_str = action.trigger.display_tag();
+            write!(
+                out,
+                "{open_bracket}{key_str}{close_bracket}{}{}",
+                if action.label.is_empty() { "" } else { " " },
+                action.label
+            )?;
             if idx < self.actions.len() - 1 {
                 write!(out, "{gap}")?;
             }

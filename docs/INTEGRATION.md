@@ -17,7 +17,7 @@ semantics; it never invents them.
 | A completed state change | `Receipt::success(title)` + `.change()` from the **actual** result | Never reconstruct what "probably happened" |
 | A fatal failure | `ErrorModel::new(what)` + `.with_why()` when genuinely known | Omit `why` rather than guessing; uncertainty is preserved |
 | A non-fatal warning | `Notice::warning(msg)` | Warnings stay notices; never promote them to errors |
-| A next step with no working key | `Action::hint(id, label)` | Renders as plain guidance, no fake `[key]` brackets |
+| A next step with no working key | Omit it; attach only keys the app really handles | Dead keys are worse than no keys — a notice can carry the guidance instead |
 | A next step with a working key | `Action::new(key, id, label)` | Only if the keypress is really handled |
 | Machine output | `RenderAgent::to_agent_json()` on the semantic type | Never wrap your own JSON in a Sartorial envelope |
 
@@ -26,7 +26,9 @@ semantics; it never invents them.
 ```rust
 use sartorial::{Preset, RenderContext, SartorialOutput, SummaryScreen, Status};
 
-// Human House view, or pipe-safe plain when redirected — no Config needed.
+// Human House view for terminals; explicit pipe-safe plain for pipes.
+// human() does NOT auto-switch: it sniffs the stdout TTY for color/symbols
+// but the target stays Human. Call plain_preset() when stdout is redirected.
 let ctx = RenderContext::human(Preset::House);
 
 // Machine mode: your own data, your own JSON, stdout only, stderr silent.
@@ -61,7 +63,8 @@ Presets never change facts, ordering, statuses, warnings, or agent JSON.
 ## Traps
 
 1. **Dead keys.** Attaching `Action::new('d', …)` when no key handling exists
-   prints a fake `[D]` prompt. Use `Action::hint` instead.
+   prints a fake `[D]` prompt. Attach only keys the application really
+   handles; put the guidance in a notice instead.
 2. **Fake progress.** `Activity` mode exists precisely so unknown work never
    needs a percentage. Totals that aren't real are lies with numbers.
 3. **Guessed causes.** `ErrorModel` without `with_why` renders an explicit

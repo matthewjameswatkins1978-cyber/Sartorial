@@ -53,7 +53,7 @@ fn main() -> std::io::Result<()> {
             ErrorModel::new("Demo check failed")
                 .with_why("The --fail flag was passed; nothing was actually scanned.")
                 .with_evidence(Evidence::new("No evidence: this error is synthetic."))
-                .with_action(Action::hint("retry", "Rerun without --fail")),
+                .with_action(Action::new('r', "retry", "Rerun without --fail")),
         );
         SartorialOutput::print_diagnostic(&view, &ctx)?;
         std::process::exit(1);
@@ -70,7 +70,7 @@ fn main() -> std::io::Result<()> {
         .fact("Checks", "42 passed")
         .with_table(table)
         .notice(Notice::info("1 optional tool can be installed."))
-        .action(Action::hint("install", "Install fd for faster search"));
+        .action(Action::new('i', "install", "Install fd for faster search"));
     SartorialOutput::print_result(&summary, &ctx)?;
 
     // 4. Consequential dry-run: a Plan that mutates nothing.
