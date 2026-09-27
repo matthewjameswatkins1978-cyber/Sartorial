@@ -4,6 +4,8 @@ use crate::components::section::Section;
 use crate::components::table::TableView;
 use crate::components::title::Title;
 use crate::render::context::RenderContext;
+use crate::render::human::HumanRenderer;
+use crate::render::plain::PlainRenderer;
 use crate::render::{RenderHuman, RenderPlain};
 use crate::semantic::action::Action;
 use crate::semantic::notice::Notice;
@@ -53,8 +55,8 @@ impl ListScreen {
 impl RenderHuman for ListScreen {
     fn render_human(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
         let title_comp = Title::new(&self.title);
-        title_comp.render_human(ctx, out)?;
-        writeln!(out)?;
+        title_comp.render_block_human(None, ctx, out)?;
+        HumanRenderer::write_component_gap(out, ctx)?;
 
         if let Some(ref badge) = self.count_badge {
             let sec = Section::new("Collection").with_badge(badge);
@@ -65,7 +67,7 @@ impl RenderHuman for ListScreen {
         tv.render_human(ctx, out)?;
 
         if !self.notices.is_empty() {
-            writeln!(out)?;
+            HumanRenderer::write_component_gap(out, ctx)?;
             for n in &self.notices {
                 let nv = NoticeView::new(n.clone());
                 nv.render_human(ctx, out)?;
@@ -73,7 +75,7 @@ impl RenderHuman for ListScreen {
         }
 
         if !self.actions.is_empty() {
-            writeln!(out)?;
+            HumanRenderer::write_component_gap(out, ctx)?;
             let ab = ActionBar::from_actions(self.actions.clone());
             ab.render_human(ctx, out)?;
         }
@@ -85,8 +87,8 @@ impl RenderHuman for ListScreen {
 impl RenderPlain for ListScreen {
     fn render_plain(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
         let title_comp = Title::new(&self.title);
-        title_comp.render_plain(ctx, out)?;
-        writeln!(out)?;
+        title_comp.render_block_plain(None, ctx, out)?;
+        PlainRenderer::write_component_gap(out, ctx)?;
 
         if let Some(ref badge) = self.count_badge {
             let sec = Section::new("Collection").with_badge(badge);
@@ -97,7 +99,7 @@ impl RenderPlain for ListScreen {
         tv.render_plain(ctx, out)?;
 
         if !self.notices.is_empty() {
-            writeln!(out)?;
+            PlainRenderer::write_component_gap(out, ctx)?;
             for n in &self.notices {
                 let nv = NoticeView::new(n.clone());
                 nv.render_plain(ctx, out)?;
@@ -105,7 +107,7 @@ impl RenderPlain for ListScreen {
         }
 
         if !self.actions.is_empty() {
-            writeln!(out)?;
+            PlainRenderer::write_component_gap(out, ctx)?;
             let ab = ActionBar::from_actions(self.actions.clone());
             ab.render_plain(ctx, out)?;
         }

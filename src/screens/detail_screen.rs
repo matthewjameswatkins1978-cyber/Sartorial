@@ -5,6 +5,7 @@ use crate::components::section::Section;
 use crate::components::title::Title;
 use crate::render::context::RenderContext;
 use crate::render::human::HumanRenderer;
+use crate::render::plain::PlainRenderer;
 use crate::render::{RenderHuman, RenderPlain};
 use crate::semantic::action::Action;
 use crate::semantic::evidence::Evidence;
@@ -65,20 +66,20 @@ impl DetailScreen {
 impl RenderHuman for DetailScreen {
     fn render_human(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
         let title_comp = Title::new(&self.title);
-        title_comp.render_human(ctx, out)?;
-        writeln!(out)?;
+        title_comp.render_block_human(None, ctx, out)?;
+        HumanRenderer::write_component_gap(out, ctx)?;
 
         let section = Section::new("Status").with_status(self.status);
         section.render_human(ctx, out)?;
 
         if !self.facts.is_empty() {
-            writeln!(out)?;
+            HumanRenderer::write_component_gap(out, ctx)?;
             let kv = KeyValueList::from_facts(self.facts.clone());
             kv.render_human(ctx, out)?;
         }
 
         if let Some(ref ev) = self.evidence {
-            writeln!(out)?;
+            HumanRenderer::write_component_gap(out, ctx)?;
             let ev_sec = Section::new("Evidence");
             ev_sec.render_human(ctx, out)?;
 
@@ -111,7 +112,7 @@ impl RenderHuman for DetailScreen {
             }
 
             if let Some(ref det) = ev.details {
-                writeln!(out)?;
+                HumanRenderer::write_component_gap(out, ctx)?;
                 HumanRenderer::write_rule(out, ctx, ctx.width.min(60))?;
                 for line in det.lines() {
                     HumanRenderer::write_styled(
@@ -127,7 +128,7 @@ impl RenderHuman for DetailScreen {
         }
 
         if !self.notices.is_empty() {
-            writeln!(out)?;
+            HumanRenderer::write_component_gap(out, ctx)?;
             for n in &self.notices {
                 let nv = NoticeView::new(n.clone());
                 nv.render_human(ctx, out)?;
@@ -135,7 +136,7 @@ impl RenderHuman for DetailScreen {
         }
 
         if !self.actions.is_empty() {
-            writeln!(out)?;
+            HumanRenderer::write_component_gap(out, ctx)?;
             let ab = ActionBar::from_actions(self.actions.clone());
             ab.render_human(ctx, out)?;
         }
@@ -147,20 +148,20 @@ impl RenderHuman for DetailScreen {
 impl RenderPlain for DetailScreen {
     fn render_plain(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
         let title_comp = Title::new(&self.title);
-        title_comp.render_plain(ctx, out)?;
-        writeln!(out)?;
+        title_comp.render_block_plain(None, ctx, out)?;
+        PlainRenderer::write_component_gap(out, ctx)?;
 
         let section = Section::new("Status").with_status(self.status);
         section.render_plain(ctx, out)?;
 
         if !self.facts.is_empty() {
-            writeln!(out)?;
+            PlainRenderer::write_component_gap(out, ctx)?;
             let kv = KeyValueList::from_facts(self.facts.clone());
             kv.render_plain(ctx, out)?;
         }
 
         if let Some(ref ev) = self.evidence {
-            writeln!(out)?;
+            PlainRenderer::write_component_gap(out, ctx)?;
             let ev_sec = Section::new("Evidence");
             ev_sec.render_plain(ctx, out)?;
 
@@ -172,7 +173,7 @@ impl RenderPlain for DetailScreen {
                 writeln!(out, "Handle: {handle}")?;
             }
             if let Some(ref det) = ev.details {
-                writeln!(out)?;
+                PlainRenderer::write_component_gap(out, ctx)?;
                 for line in det.lines() {
                     writeln!(out, "{line}")?;
                 }
@@ -180,7 +181,7 @@ impl RenderPlain for DetailScreen {
         }
 
         if !self.notices.is_empty() {
-            writeln!(out)?;
+            PlainRenderer::write_component_gap(out, ctx)?;
             for n in &self.notices {
                 let nv = NoticeView::new(n.clone());
                 nv.render_plain(ctx, out)?;
@@ -188,7 +189,7 @@ impl RenderPlain for DetailScreen {
         }
 
         if !self.actions.is_empty() {
-            writeln!(out)?;
+            PlainRenderer::write_component_gap(out, ctx)?;
             let ab = ActionBar::from_actions(self.actions.clone());
             ab.render_plain(ctx, out)?;
         }

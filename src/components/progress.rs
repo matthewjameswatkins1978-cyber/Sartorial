@@ -11,9 +11,17 @@ use std::io::{self, Write};
 use std::time::Duration;
 
 /// Progress component providing restrained, truthful progress reporting under the BL Motion Standard.
+///
+/// Live presentation uses the **stderr** TTY (spinners draw on stderr), while
+/// the render context is detected from the **stdout** TTY. The split is
+/// deliberate: result output may be piped to a file while progress still
+/// animates on an attended terminal, and vice versa. See
+/// [`ProgressBar::start_live`] for the exact rules.
 pub struct ProgressBar {
     state: ProgressState,
     indicatif_bar: Option<indicatif::ProgressBar>,
+    /// Last static line flushed to stderr (Minimal/Numeric treatments).
+    last_static_line: Option<String>,
 }
 
 impl ProgressBar {
@@ -21,6 +29,7 @@ impl ProgressBar {
         Self {
             state: ProgressState::new(task),
             indicatif_bar: None,
+            last_static_line: None,
         }
     }
 
@@ -28,6 +37,7 @@ impl ProgressBar {
         Self {
             state: ProgressState::activity(task),
             indicatif_bar: None,
+            last_static_line: None,
         }
     }
 
@@ -35,6 +45,7 @@ impl ProgressBar {
         Ok(Self {
             state: ProgressState::count(task, current, total)?,
             indicatif_bar: None,
+            last_static_line: None,
         })
     }
 
@@ -42,6 +53,7 @@ impl ProgressBar {
         Self {
             state: ProgressState::percent(task, percent),
             indicatif_bar: None,
+            last_static_line: None,
         }
     }
 
@@ -49,6 +61,7 @@ impl ProgressBar {
         Self {
             state: ProgressState::countdown(task, secs),
             indicatif_bar: None,
+            last_static_line: None,
         }
     }
 
@@ -62,6 +75,7 @@ impl ProgressBar {
         Ok(Self {
             state: ProgressState::rate(task, current, total, unit, rate)?,
             indicatif_bar: None,
+            last_static_line: None,
         })
     }
 
@@ -153,15 +167,27 @@ impl ProgressBar {
     }
 
     /// Single authority for beginning live progress presentation with explicit TTY capability.
+    ///
+    /// `is_tty` must describe the **stderr** stream (the progress channel):
+    /// pass `std::io::stderr().is_terminal()`. Animation additionally
+    /// requires a human target, a permitting motion policy, and a preset
+    /// treatment that animates at all — Minimal (Black Tie) and Numeric
+    /// (Workwear) never spin; they emit one static line at start, one per
+    /// semantic change, and one at completion.
     pub fn start_live_with_tty(&mut self, ctx: &RenderContext, is_tty: bool) -> io::Result<()> {
         self.state
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
-        if ctx.should_animate(is_tty) {
+        let treatment = ctx.style.progress_treatment;
+        let static_protocol = matches!(
+            treatment,
+            ProgressTreatment::Minimal | ProgressTreatment::Numeric
+        );
+        if ctx.should_animate(is_tty) && !static_protocol {
             let pb = indicatif::ProgressBar::new_spinner();
             pb.enable_steady_tick(Duration::from_millis(100)); // 10 Hz rate limit
 
-            let template = match ctx.style.progress_treatment {
+            let template = match treatment {
                 ProgressTreatment::Numeric => "{msg}",
                 ProgressTreatment::Minimal => "{spinner} {msg}",
                 ProgressTreatment::Expressive => "{spinner} {msg}",
@@ -170,10 +196,11 @@ impl ProgressBar {
             let tick_chars = if ctx.symbols == SymbolMode::Ascii {
                 "/-\\| "
             } else {
-                match ctx.style.progress_treatment {
+                match treatment {
                     ProgressTreatment::Minimal => "• ",
                     ProgressTreatment::Numeric => "- ",
-                    _ => "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ ",
+                    ProgressTreatment::Restrained => "◐◑◒◓ ",
+                    ProgressTreatment::Expressive => "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ ",
                 }
             };
             if let Ok(style) = indicatif::ProgressStyle::default_spinner()
@@ -190,6 +217,8 @@ impl ProgressBar {
             };
             pb.set_message(msg);
             self.indicatif_bar = Some(pb);
+        } else if static_protocol {
+            self.flush_static_line(ctx)?;
         } else if ctx.target.is_plain() {
             let mut err = io::stderr();
             write!(err, "Starting: {}", self.state.task)?;
@@ -204,6 +233,60 @@ impl ProgressBar {
                 write!(err, " - {sub}")?;
             }
             writeln!(err)?;
+        }
+        Ok(())
+    }
+
+    /// Unstyled static line for the Minimal/Numeric protocol: what is running
+    /// and where it is, with real counts only. Never percentages, never spin.
+    fn static_line(&self, ctx: &RenderContext) -> String {
+        let mut evidence = String::new();
+        if let (Some(cur), Some(tot)) = (self.state.current, self.state.total) {
+            evidence.push_str(&format!("  {cur}/{tot}"));
+            if let Some(ref unit) = self.state.unit {
+                evidence.push_str(&format!(" {unit}"));
+            }
+        }
+        if let Some(ref rate) = self.state.rate {
+            evidence.push_str(&format!("  {rate}"));
+        }
+        match ctx.style.progress_treatment {
+            ProgressTreatment::Numeric => {
+                let mut line = format!(
+                    "{}{}  ",
+                    ctx.style.section_marker,
+                    self.state.task.to_uppercase()
+                );
+                if let Some(ref sub) = self.state.subtask {
+                    line.push_str(sub);
+                }
+                line.push_str(&evidence);
+                line
+            }
+            _ => {
+                let mut line = self.state.task.clone();
+                if let Some(ref sub) = self.state.subtask {
+                    line.push_str(&format!(" · {sub}"));
+                }
+                line.push_str(&evidence);
+                line
+            }
+        }
+    }
+
+    /// Print the static line, but only when it changed since the last flush:
+    /// Minimal moves only when information changes.
+    fn flush_static_line(&mut self, ctx: &RenderContext) -> io::Result<()> {
+        let line = self.static_line(ctx);
+        if self.last_static_line.as_deref() != Some(line.as_str()) {
+            if ctx.target.is_plain() {
+                let mut err = io::stderr();
+                writeln!(err, "{line}")?;
+            } else if !ctx.target.is_agent() {
+                let mut err = anstream::stderr();
+                writeln!(err, "{line}")?;
+            }
+            self.last_static_line = Some(line);
         }
         Ok(())
     }
@@ -229,7 +312,12 @@ impl ProgressBar {
     }
 
     /// Visibly update live progress.
-    pub fn update_live(&mut self, _ctx: &RenderContext) -> io::Result<()> {
+    ///
+    /// Spinner treatments update the spinner message in place. Minimal and
+    /// Numeric treatments reprint a static line, but only when the semantic
+    /// content actually changed (new phase, new counts) — never a busy tick.
+    /// Non-animating House/Studio print nothing here.
+    pub fn update_live(&mut self, ctx: &RenderContext) -> io::Result<()> {
         if let Some(ref pb) = self.indicatif_bar {
             if let Some(cur) = self.state.current {
                 pb.set_position(cur);
@@ -251,9 +339,13 @@ impl ProgressBar {
                 msg.push_str(&format!("  {s}s"));
             }
             pb.set_message(msg);
+            return Ok(());
         }
-        // Non-TTY / static: do NOT print repeated updates (prevents line spam in logs/pipes!)
-        Ok(())
+        match ctx.style.progress_treatment {
+            ProgressTreatment::Minimal | ProgressTreatment::Numeric => self.flush_static_line(ctx),
+            // Non-TTY / static: do NOT print repeated updates (prevents line spam in logs/pipes!)
+            _ => Ok(()),
+        }
     }
 
     /// Cleanly finish and clear live presentation, leaving final status line where appropriate.
@@ -316,47 +408,46 @@ impl RenderHuman for ProgressBar {
         let is_ascii = ctx.symbols == SymbolMode::Ascii;
         let treatment = ctx.style.progress_treatment;
 
-        // Workwear: Compact numeric bracket format "[38/60] 63%  00:14  cargo test"
+        // Workwear: operational voice. `» SCAN  languages`, `» COPY  18/42`,
+        // completion `✓ SCAN  finalize`. Real counts and rates foregrounded;
+        // nothing manufactured (Activity simply shows no numbers).
         if treatment == ProgressTreatment::Numeric {
-            let count_str = match (self.state.current, self.state.total) {
-                (Some(c), Some(t)) => format!("[{c}/{t}]"),
-                _ => {
-                    if let Some(pct) = self.state.derived_percent() {
-                        format!("[{pct}%]")
-                    } else {
-                        "[-]".to_string()
-                    }
+            if self.state.status == Status::Running {
+                write!(out, "{}", ctx.style.section_marker)?;
+            } else {
+                let glyph = match ctx.symbols {
+                    SymbolMode::Ascii => self.state.status.ascii_glyph(),
+                    _ => self.state.status.unicode_glyph(),
+                };
+                if ctx.color_enabled {
+                    HumanRenderer::write_styled(out, self.state.status.style(), glyph, true)?;
+                } else {
+                    write!(out, "{glyph}")?;
                 }
-            };
+                write!(out, " ")?;
+            }
             HumanRenderer::write_styled(
                 out,
                 ctx.style.key_char_style(),
-                &count_str,
+                &self.state.task.to_uppercase(),
                 ctx.color_enabled,
             )?;
-
-            if self.state.current.is_some() && self.state.total.is_some() {
-                if let Some(pct) = self.state.derived_percent() {
-                    write!(out, " {pct}%")?;
-                }
-            }
-
-            if let Some(secs) = self.state.elapsed_secs {
-                let mins = secs / 60;
-                let rem_s = secs % 60;
-                write!(out, "  {:02}:{:02}", mins, rem_s)?;
-            }
-
             if let Some(ref subtask) = self.state.subtask {
-                write!(out, "  ")?;
-                HumanRenderer::write_styled(
-                    out,
-                    ctx.style.muted_style(),
-                    subtask,
-                    ctx.color_enabled,
-                )?;
-            } else {
-                write!(out, "  {}", self.state.task)?;
+                write!(out, "  {subtask}")?;
+            }
+            if let (Some(cur), Some(tot)) = (self.state.current, self.state.total) {
+                write!(out, "  {cur}/{tot}")?;
+                if let Some(ref unit) = self.state.unit {
+                    write!(out, " {unit}")?;
+                }
+            } else if let Some(pct) = self.state.derived_percent() {
+                write!(out, "  {pct}%")?;
+            }
+            if let Some(ref rate) = self.state.rate {
+                write!(out, "  {rate}")?;
+            }
+            if let Some(secs) = self.state.elapsed_secs {
+                write!(out, "  {secs}s")?;
             }
             return writeln!(out);
         }
@@ -486,6 +577,7 @@ impl From<ProgressState> for ProgressBar {
         Self {
             state,
             indicatif_bar: None,
+            last_static_line: None,
         }
     }
 }

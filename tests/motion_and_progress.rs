@@ -94,7 +94,9 @@ fn test_zero_total_semantics_0_0_and_1_0_never_derive_100_percent() {
     let cfg_ww = Config::new().with_preset(Preset::Workwear);
     let ctx_ww = RenderContext::detect().with_config(cfg_ww);
     let human0 = p0.to_human_string(&ctx_ww).unwrap();
-    assert!(human0.contains("[0/0]"));
+    // Workwear v0.2 voice: operational `» ZERO TOTAL TASKS  0/0`, no percent.
+    assert!(human0.contains("0/0"));
+    assert!(human0.contains("ZERO TOTAL TASKS"));
     assert!(!human0.contains("100%"));
 
     let json0 = p0.state().to_agent_json(false).unwrap();
@@ -171,7 +173,8 @@ fn test_contradictory_progress_input_enforces_single_authority() {
     let mut hostile_pb = ProgressBar::count("Hostile task", 50, 100).unwrap();
     hostile_pb.state_mut().percent = Some(12);
     let human_out = hostile_pb.to_human_string(&ctx_ww).unwrap();
-    assert!(human_out.contains("[50/100] 50%"));
+    // Workwear v0.2 voice foregrounds real counts; the hostile 12% is ignored.
+    assert!(human_out.contains("50/100"));
     assert!(!human_out.contains("12%"));
 }
 

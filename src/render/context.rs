@@ -33,6 +33,12 @@ impl Default for RenderContext {
 
 impl RenderContext {
     /// Automatically detect terminal capabilities and current terminal dimensions.
+    ///
+    /// Detection reads the **stdout** TTY: color, symbols, and width describe
+    /// where results land. Live progress is different — spinners draw on
+    /// **stderr**, so [`crate::components::ProgressBar::start_live`] sniffs
+    /// the stderr TTY instead. The split lets piped results stay clean while
+    /// an attended terminal still animates, and vice versa.
     pub fn detect() -> Self {
         let is_tty = std::io::stdout().is_terminal();
         let config = Config::default();
@@ -57,13 +63,31 @@ impl RenderContext {
 
     /// Context explicitly configured for pipe-safe plain output.
     pub fn plain() -> Self {
-        let mut ctx = Self::detect();
-        ctx.target = RenderTarget::Plain;
-        ctx.color_enabled = false;
-        ctx.symbols = SymbolMode::Ascii;
-        ctx.style.color_enabled = false;
-        ctx.style.symbols = SymbolMode::Ascii;
-        ctx
+        Self::plain_preset(crate::style::Preset::House)
+    }
+
+    /// Pipe-safe plain context for an explicit preset: the layout grammar
+    /// (casing, markers, density) is preserved, ANSI and animation are off.
+    pub fn plain_preset(preset: crate::style::Preset) -> Self {
+        let config = Config::default().with_preset(preset);
+        Self::detect()
+            .with_config(config)
+            .with_target(RenderTarget::Plain)
+    }
+
+    /// Human terminal context for a preset with the default motion policy.
+    /// This is the normal entry point: no `Config` knowledge required.
+    pub fn human(preset: crate::style::Preset) -> Self {
+        Self::human_motion(preset, crate::motion::MotionMode::Auto)
+    }
+
+    /// Human terminal context for a preset with an explicit motion policy
+    /// (use `MotionMode::Never` for animation-free output and tests).
+    pub fn human_motion(preset: crate::style::Preset, motion: crate::motion::MotionMode) -> Self {
+        let config = Config::default().with_preset(preset).with_motion(motion);
+        Self::detect()
+            .with_config(config)
+            .with_target(RenderTarget::Human)
     }
 
     /// Context explicitly configured for structured agent output.
@@ -73,6 +97,28 @@ impl RenderContext {
         ctx.color_enabled = false;
         ctx.style.color_enabled = false;
         ctx
+    }
+
+    /// Re-apply the invariants of the current target after any mutation.
+    ///
+    /// Single authority for target-specific overrides, so builder-call
+    /// order cannot matter: both [`Self::with_config`] and
+    /// [`Self::with_target`] funnel through here. Plain output is pipe-safe
+    /// ASCII — every symbol-dependent grammar decision is forced back to
+    /// ASCII no matter what the config resolved. (Badges and rules read
+    /// `symbols` live at render time, so flipping the mode covers them.)
+    fn apply_target_overrides(&mut self) {
+        if self.target.is_plain() || self.target.is_agent() {
+            self.color_enabled = false;
+            self.style.color_enabled = false;
+        }
+        if self.target.is_plain() {
+            self.symbols = SymbolMode::Ascii;
+            self.style.symbols = SymbolMode::Ascii;
+            self.style.title_marker = self.style.preset.ascii_structural_marker();
+            self.style.section_marker = self.style.preset.ascii_structural_marker();
+            self.style.rule_char = self.style.preset.rule_char(SymbolMode::Ascii);
+        }
     }
 
     /// Set an explicit configuration.
@@ -85,20 +131,14 @@ impl RenderContext {
             self.width = w;
         }
         self.config = config;
+        self.apply_target_overrides();
         self
     }
 
     /// Set an explicit target.
     pub fn with_target(mut self, target: RenderTarget) -> Self {
         self.target = target;
-        if target.is_plain() || target.is_agent() {
-            self.color_enabled = false;
-            self.style.color_enabled = false;
-        }
-        if target.is_plain() {
-            self.symbols = SymbolMode::Ascii;
-            self.style.symbols = SymbolMode::Ascii;
-        }
+        self.apply_target_overrides();
         self
     }
 

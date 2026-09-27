@@ -6,6 +6,7 @@ use crate::components::table::TableView;
 use crate::components::title::Title;
 use crate::render::context::RenderContext;
 use crate::render::human::HumanRenderer;
+use crate::render::plain::PlainRenderer;
 use crate::render::{RenderHuman, RenderPlain};
 use crate::semantic::action::Action;
 use crate::semantic::fact::Fact;
@@ -83,14 +84,10 @@ impl SummaryScreen {
 
 impl RenderHuman for SummaryScreen {
     fn render_human(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
-        // Title
+        // Title block (preset casing, marker, subtitle rhythm, block rule)
         let title_comp = Title::new(&self.title);
-        title_comp.render_human(ctx, out)?;
-        if let Some(ref sub) = self.subtitle {
-            HumanRenderer::write_styled(out, HumanRenderer::muted_style(), sub, ctx.color_enabled)?;
-            writeln!(out)?;
-        }
-        writeln!(out)?;
+        title_comp.render_block_human(self.subtitle.as_deref(), ctx, out)?;
+        HumanRenderer::write_component_gap(out, ctx)?;
 
         // Top Status Section
         let section = Section::new("Status").with_status(self.status);
@@ -98,21 +95,21 @@ impl RenderHuman for SummaryScreen {
 
         // Facts (if any)
         if !self.facts.is_empty() {
-            writeln!(out)?;
+            HumanRenderer::write_component_gap(out, ctx)?;
             let kv = KeyValueList::from_facts(self.facts.clone());
             kv.render_human(ctx, out)?;
         }
 
         // Table (if any)
         if let Some(ref tbl) = self.table {
-            writeln!(out)?;
+            HumanRenderer::write_component_gap(out, ctx)?;
             let tv = TableView::new(tbl.clone());
             tv.render_human(ctx, out)?;
         }
 
         // Notices
         if !self.notices.is_empty() {
-            writeln!(out)?;
+            HumanRenderer::write_component_gap(out, ctx)?;
             for n in &self.notices {
                 let nv = NoticeView::new(n.clone());
                 nv.render_human(ctx, out)?;
@@ -121,7 +118,7 @@ impl RenderHuman for SummaryScreen {
 
         // Action footer
         if !self.actions.is_empty() {
-            writeln!(out)?;
+            HumanRenderer::write_component_gap(out, ctx)?;
             let ab = ActionBar::from_actions(self.actions.clone());
             ab.render_human(ctx, out)?;
         }
@@ -133,29 +130,26 @@ impl RenderHuman for SummaryScreen {
 impl RenderPlain for SummaryScreen {
     fn render_plain(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
         let title_comp = Title::new(&self.title);
-        title_comp.render_plain(ctx, out)?;
-        if let Some(ref sub) = self.subtitle {
-            writeln!(out, "{sub}")?;
-        }
-        writeln!(out)?;
+        title_comp.render_block_plain(self.subtitle.as_deref(), ctx, out)?;
+        PlainRenderer::write_component_gap(out, ctx)?;
 
         let section = Section::new("Status").with_status(self.status);
         section.render_plain(ctx, out)?;
 
         if !self.facts.is_empty() {
-            writeln!(out)?;
+            PlainRenderer::write_component_gap(out, ctx)?;
             let kv = KeyValueList::from_facts(self.facts.clone());
             kv.render_plain(ctx, out)?;
         }
 
         if let Some(ref tbl) = self.table {
-            writeln!(out)?;
+            PlainRenderer::write_component_gap(out, ctx)?;
             let tv = TableView::new(tbl.clone());
             tv.render_plain(ctx, out)?;
         }
 
         if !self.notices.is_empty() {
-            writeln!(out)?;
+            PlainRenderer::write_component_gap(out, ctx)?;
             for n in &self.notices {
                 let nv = NoticeView::new(n.clone());
                 nv.render_plain(ctx, out)?;
@@ -163,7 +157,7 @@ impl RenderPlain for SummaryScreen {
         }
 
         if !self.actions.is_empty() {
-            writeln!(out)?;
+            PlainRenderer::write_component_gap(out, ctx)?;
             let ab = ActionBar::from_actions(self.actions.clone());
             ab.render_plain(ctx, out)?;
         }

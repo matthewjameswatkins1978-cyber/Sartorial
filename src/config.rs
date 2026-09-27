@@ -108,7 +108,7 @@ impl InteractiveMode {
 use crate::accessibility::AccessibilityMode;
 use crate::motion::MotionMode;
 use crate::pager::PagerMode;
-use crate::style::{Preset, ProgressTreatment, ResolvedStyle};
+use crate::style::{Preset, ResolvedStyle};
 use crate::verbosity::Verbosity;
 
 /// Sartorial configuration embodying the Biscuit Logic CLI Presentation Standard.
@@ -260,11 +260,18 @@ impl Config {
         let color_enabled =
             self.color.should_render_color(is_tty) && !self.accessibility.is_plain();
 
-        let progress_treatment = match self.preset {
-            Preset::House => ProgressTreatment::Restrained,
-            Preset::BlackTie => ProgressTreatment::Minimal,
-            Preset::Workwear => ProgressTreatment::Numeric,
-            Preset::Studio => ProgressTreatment::Expressive,
+        // Markers depend on the resolved symbol set so ASCII contexts never
+        // leak non-ASCII glyphs into the layout grammar.
+        let (title_marker, section_marker) = if symbols == SymbolMode::Ascii {
+            (
+                self.preset.ascii_structural_marker(),
+                self.preset.ascii_structural_marker(),
+            )
+        } else {
+            (
+                self.preset.structural_marker(),
+                self.preset.structural_marker(),
+            )
         };
 
         ResolvedStyle {
@@ -275,8 +282,20 @@ impl Config {
             symbols,
             action_spacing: self.preset.action_spacing(),
             rule_char: self.preset.rule_char(symbols),
-            progress_treatment,
+            progress_treatment: self.preset.progress_treatment(),
             color_enabled,
+            title_case: self.preset.title_case(),
+            title_marker,
+            title_block_rule: self.preset.title_block_rule(),
+            status_layout: self.preset.status_layout(),
+            status_gap: self.preset.status_gap(),
+            section_marker,
+            section_rule: self.preset.section_rule(),
+            component_gap: self.preset.component_gap(),
+            fact_uppercase: self.preset.fact_uppercase(),
+            fact_colon: self.preset.fact_colon(),
+            notice_compact: self.preset.notice_compact(),
+            table_headers: self.preset.table_headers(),
         }
     }
 }

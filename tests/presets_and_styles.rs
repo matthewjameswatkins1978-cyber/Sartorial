@@ -60,10 +60,21 @@ fn test_same_semantic_content_across_all_four_presets() {
         let ctx = RenderContext::plain().with_config(Config::new().with_preset(p));
         let plain = outcome.to_plain_string(&ctx).unwrap();
 
-        // Semantic invariant: essential data is identical across all presets
-        assert!(plain.contains("VERIFICATION PASSED"));
+        // Semantic invariant: essential data is identical across all presets.
+        // Title casing is presentation grammar: House/Workwear uppercase,
+        // Black Tie/Studio preserve the application-supplied case.
+        let title = match p {
+            Preset::House | Preset::Workwear => "VERIFICATION PASSED",
+            Preset::BlackTie | Preset::Studio => "Verification Passed",
+        };
+        assert!(plain.contains(title));
         assert!(plain.contains("All checks passed"));
-        assert!(plain.contains("Target"));
+        // Fact labels follow the same grammar: operator voice uppercases.
+        let fact = match p {
+            Preset::Workwear => "TARGET:",
+            _ => "Target",
+        };
+        assert!(plain.contains(fact));
         assert!(plain.contains("Release"));
         assert!(plain.contains("Open"));
         assert!(plain.contains("Quit"));

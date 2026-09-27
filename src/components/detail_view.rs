@@ -59,7 +59,7 @@ impl RenderHuman for DetailView {
         }
 
         if let Some(ref details) = self.evidence.details {
-            writeln!(out)?;
+            HumanRenderer::write_component_gap(out, ctx)?;
             HumanRenderer::write_rule(out, ctx, ctx.width.min(60))?;
             for line in details.lines() {
                 HumanRenderer::write_styled(

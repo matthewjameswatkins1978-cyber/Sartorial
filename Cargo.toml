@@ -1,6 +1,6 @@
 [package]
 name = "sartorial"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Matthew Watkins <matthew@biscuitlogic.com>"]
 description = "An opinionated Rust presentation toolkit for command-line applications."

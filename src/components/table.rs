@@ -152,11 +152,36 @@ impl RenderHuman for TableView {
             widths.iter().sum::<usize>() + (active_cols.len().saturating_sub(1) * col_gap);
         let rule_len = total_content_width.min(ctx.width);
 
+        let is_ascii = ctx.symbols == SymbolMode::Ascii;
+
+        // Formal rhythm: heading row with a thin rule separating it from rows.
+        if ctx.style.table_headers && !self.model.headers.is_empty() {
+            for (pos, &i) in active_cols.iter().enumerate() {
+                let cell = self.model.headers.get(i).map(|s| s.as_str()).unwrap_or("");
+                let col_width = widths.get(i).copied().unwrap_or(cell.width());
+                let cell_truncated = Self::truncate_with_ellipsis(cell, col_width, is_ascii);
+                let is_last = pos == active_cols.len() - 1;
+                let formatted = if is_last {
+                    cell_truncated
+                } else {
+                    Self::pad_cell(&cell_truncated, col_width, ColumnAlignment::Left)
+                };
+                HumanRenderer::write_styled(
+                    out,
+                    ctx.style.section_style(),
+                    &formatted,
+                    ctx.color_enabled,
+                )?;
+                if !is_last {
+                    write!(out, "{}", " ".repeat(col_gap))?;
+                }
+            }
+            writeln!(out)?;
+        }
+
         if ctx.style.border == BorderStyle::Subtle {
             HumanRenderer::write_rule(out, ctx, rule_len)?;
         }
-
-        let is_ascii = ctx.symbols == SymbolMode::Ascii;
 
         // Render rows
         for row in &self.model.rows {
@@ -238,9 +263,28 @@ impl RenderPlain for TableView {
             widths.iter().sum::<usize>() + (active_cols.len().saturating_sub(1) * col_gap);
         let rule_len = total_content_width.min(ctx.width);
 
-        PlainRenderer::write_rule(out, ctx, rule_len)?;
-
         let is_ascii = ctx.symbols == SymbolMode::Ascii;
+
+        if ctx.style.table_headers && !self.model.headers.is_empty() {
+            for (pos, &i) in active_cols.iter().enumerate() {
+                let cell = self.model.headers.get(i).map(|s| s.as_str()).unwrap_or("");
+                let col_width = widths.get(i).copied().unwrap_or(cell.width());
+                let cell_truncated = Self::truncate_with_ellipsis(cell, col_width, is_ascii);
+                let is_last = pos == active_cols.len() - 1;
+                let formatted = if is_last {
+                    cell_truncated
+                } else {
+                    Self::pad_cell(&cell_truncated, col_width, ColumnAlignment::Left)
+                };
+                write!(out, "{formatted}")?;
+                if !is_last {
+                    write!(out, "{}", " ".repeat(col_gap))?;
+                }
+            }
+            writeln!(out)?;
+        }
+
+        PlainRenderer::write_rule(out, ctx, rule_len)?;
 
         for row in &self.model.rows {
             for (pos, &i) in active_cols.iter().enumerate() {
