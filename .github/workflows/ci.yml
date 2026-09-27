@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check-format:
+    name: Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Run cargo fmt check
+        run: cargo fmt --check
+
+  build-and-test:
+    name: Build & Test
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Clippy Linter Check
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Run Tests
+        run: cargo test --all-targets --all-features
+      - name: Test Showcase Binary
+        run: cargo run --bin sartorial-demo -- --plain all
