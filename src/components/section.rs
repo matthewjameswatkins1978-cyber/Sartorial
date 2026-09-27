@@ -36,13 +36,14 @@ impl Section {
 
 impl RenderHuman for Section {
     fn render_human(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
-        let title_len = self.title.width();
+        let title_text = ctx.style.format_section_header(&self.title);
+        let title_len = title_text.width();
         let target_width = ctx.width.min(60);
 
         HumanRenderer::write_styled(
             out,
-            HumanRenderer::section_style(),
-            &self.title,
+            ctx.style.section_style(),
+            &title_text,
             ctx.color_enabled,
         )?;
 
@@ -64,12 +65,7 @@ impl RenderHuman for Section {
                 2
             };
             write!(out, "{}", " ".repeat(spaces))?;
-            HumanRenderer::write_styled(
-                out,
-                HumanRenderer::muted_style(),
-                badge,
-                ctx.color_enabled,
-            )?;
+            HumanRenderer::write_styled(out, ctx.style.muted_style(), badge, ctx.color_enabled)?;
         }
         writeln!(out)
     }
@@ -77,10 +73,11 @@ impl RenderHuman for Section {
 
 impl RenderPlain for Section {
     fn render_plain(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
-        let title_len = self.title.width();
+        let title_text = ctx.style.format_section_header(&self.title);
+        let title_len = title_text.width();
         let target_width = ctx.width.min(60);
 
-        write!(out, "{}", self.title)?;
+        write!(out, "{}", title_text)?;
 
         if let Some(status) = self.status {
             let badge_text = format!("{} {}", status.ascii_glyph(), status.display_label());

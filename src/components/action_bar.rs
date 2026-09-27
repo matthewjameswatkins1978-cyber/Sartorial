@@ -36,33 +36,34 @@ impl RenderHuman for ActionBar {
             return Ok(());
         }
 
-        let gap = if ctx.is_narrow() { "  " } else { "   " };
+        let gap = " ".repeat(ctx.style.action_gap(ctx.is_narrow()));
+        let (open_bracket, close_bracket) = ctx.style.key_delimiters();
 
         for (idx, action) in self.actions.iter().enumerate() {
             let key_str = action.trigger.display_tag();
 
             HumanRenderer::write_styled(
                 out,
-                HumanRenderer::key_bracket_style(),
-                "[",
+                ctx.style.key_bracket_style(),
+                open_bracket,
                 ctx.color_enabled,
             )?;
             HumanRenderer::write_styled(
                 out,
-                HumanRenderer::key_char_style(ctx.config.accent),
+                ctx.style.key_char_style(),
                 &key_str,
                 ctx.color_enabled,
             )?;
             HumanRenderer::write_styled(
                 out,
-                HumanRenderer::key_bracket_style(),
-                "]",
+                ctx.style.key_bracket_style(),
+                close_bracket,
                 ctx.color_enabled,
             )?;
             write!(out, " ")?;
             HumanRenderer::write_styled(
                 out,
-                HumanRenderer::value_style(),
+                ctx.style.value_style(),
                 &action.label,
                 ctx.color_enabled,
             )?;
@@ -77,13 +78,13 @@ impl RenderHuman for ActionBar {
 
 impl RenderPlain for ActionBar {
     fn render_plain(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
-        let gap = if ctx.is_narrow() { "  " } else { "   " };
+        let gap = " ".repeat(ctx.style.action_gap(ctx.is_narrow()));
+        let (open_bracket, close_bracket) = ctx.style.key_delimiters();
         for (idx, action) in self.actions.iter().enumerate() {
             let key_str = action.trigger.display_tag();
             write!(
                 out,
-                "[{}]{}{}",
-                key_str,
+                "{open_bracket}{key_str}{close_bracket}{}{}",
                 if action.label.is_empty() { "" } else { " " },
                 action.label
             )?;

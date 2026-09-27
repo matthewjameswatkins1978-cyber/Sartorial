@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use sartorial::clap_ext::SartorialArgs;
-use sartorial::protocol::{ProgressEvent, ProtocolEnvelope};
+use sartorial::exit::ExitCode;
+use sartorial::protocol::{ChoiceResult, ConfirmResult, ProgressEvent, ProtocolEnvelope};
 use sartorial::render::{RenderHuman, RenderPlain};
 use sartorial::semantic::choice::ChoiceItem;
 use sartorial::*;
@@ -95,20 +96,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 eprintln!("Usage: sartorial <COMMAND> or pipe JSON into sartorial");
                 eprintln!("Try 'sartorial --help' for details.");
-                std::process::exit(2);
+                ExitCode::UsageError.exit_process();
             }
         }
     };
 
     match cmd {
         Command::Render { file } => {
-            let raw = read_input(file.as_deref())?;
-            let envelope: ProtocolEnvelope = serde_json::from_str(&raw).map_err(|e| {
-                io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Invalid Sartorial JSON: {e}"),
-                )
-            })?;
+            let raw = match read_input(file.as_deref()) {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("sartorial: failed to read input: {e}");
+                    ExitCode::UsageError.exit_process();
+                }
+            };
+            let envelope = match ProtocolEnvelope::from_json_str(&raw) {
+                Ok(env) => env,
+                Err(e) => {
+                    eprintln!("sartorial: {e}");
+                    ExitCode::UsageError.exit_process();
+                }
+            };
 
             if ctx.target.is_agent() {
                 println!("{}", envelope.to_agent_json(true)?);
@@ -119,29 +127,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut out = anstream::stdout();
                 envelope.render_human(&ctx, &mut out)?;
             }
+            ExitCode::Success.exit_process();
         }
         Command::Stream { file } => {
             let reader: Box<dyn BufRead> = match file.as_deref() {
                 None | Some("-") => Box::new(io::BufReader::new(io::stdin())),
-                Some(path) => Box::new(io::BufReader::new(fs::File::open(path)?)),
+                Some(path) => match fs::File::open(path) {
+                    Ok(f) => Box::new(io::BufReader::new(f)),
+                    Err(e) => {
+                        eprintln!("sartorial: failed to open stream file: {e}");
+                        ExitCode::UsageError.exit_process();
+                    }
+                },
             };
 
             let mut active_bars: HashMap<String, ProgressBar> = HashMap::new();
 
             for line_res in reader.lines() {
-                let line = line_res?;
+                let line = match line_res {
+                    Ok(l) => l,
+                    Err(e) => {
+                        eprintln!("sartorial: error reading stream: {e}");
+                        ExitCode::Failed.exit_process();
+                    }
+                };
                 let trimmed = line.trim();
                 if trimmed.is_empty() {
                     continue;
                 }
 
-                let event: ProgressEvent = match serde_json::from_str(trimmed) {
+                let event = match ProgressEvent::from_json_str(trimmed) {
                     Ok(ev) => ev,
                     Err(e) => {
-                        eprintln!("sartorial: invalid progress event JSON: {e}");
-                        continue;
+                        eprintln!("sartorial: {e}");
+                        ExitCode::UsageError.exit_process();
                     }
                 };
+
+                if ctx.target.is_agent() {
+                    let serialized = serde_json::to_string(&event)?;
+                    println!("{serialized}");
+                    continue;
+                }
 
                 match event {
                     ProgressEvent::Start {
@@ -150,6 +177,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         subtask,
                         total,
                         unit,
+                        ..
                     } => {
                         let mut pb = if let Some(tot) = total {
                             ProgressBar::count(activity, 0, tot)
@@ -162,6 +190,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         if let (Some(tot), Some(u)) = (total, unit) {
                             pb = pb.with_progress(0, tot, u);
                         }
+                        pb.start_live(&ctx)?;
                         active_bars.insert(id, pb);
                     }
                     ProgressEvent::Update {
@@ -171,6 +200,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         rate,
                         elapsed_secs,
                         subtask,
+                        ..
                     } => {
                         if let Some(pb) = active_bars.get_mut(&id) {
                             if let Some(cur) = current {
@@ -180,31 +210,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     .unit
                                     .clone()
                                     .unwrap_or_else(|| "units".to_string());
-                                *pb = pb.state().clone().with_progress(cur, tot, unit).into();
+                                pb.state_mut().current = Some(cur);
+                                pb.state_mut().total = Some(tot);
+                                pb.state_mut().unit = Some(unit);
                             }
                             if let Some(pct) = percent {
-                                *pb = ProgressBar::percent(pb.state().task.clone(), pct);
+                                pb.state_mut().percent = Some(pct);
                             }
                             if let Some(secs) = elapsed_secs {
-                                *pb = pb.state().clone().with_elapsed(secs).into();
+                                pb.state_mut().elapsed_secs = Some(secs);
                             }
                             if let Some(r) = rate {
-                                *pb = pb.state().clone().with_rate(r).into();
+                                pb.state_mut().rate = Some(r);
                             }
                             if let Some(sub) = subtask {
-                                *pb = pb.state().clone().with_subtask(sub).into();
+                                pb.state_mut().subtask = Some(sub);
                             }
+                            pb.update_live(&ctx)?;
                         }
                     }
-                    ProgressEvent::Finish { id, status } => {
+                    ProgressEvent::Finish { id, status, .. } => {
                         if let Some(mut pb) = active_bars.remove(&id) {
-                            pb.finish_with_status(status);
-                            let mut err = anstream::stderr();
-                            pb.render_human(&ctx, &mut err)?;
+                            pb.finish_live(status, &ctx)?;
                         }
                     }
                 }
             }
+            ExitCode::Success.exit_process();
         }
         Command::Confirm {
             prompt,
@@ -217,31 +249,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             let outcome = confirm.prompt_with_config(&ctx.config)?;
-            match outcome {
-                ConfirmOutcome::Confirmed => {
-                    println!(r#"{{"status":"confirmed"}}"#);
-                    std::process::exit(0);
-                }
-                ConfirmOutcome::Denied => {
-                    println!(r#"{{"status":"denied"}}"#);
-                    std::process::exit(1);
-                }
-                ConfirmOutcome::NonInteractiveDenied => {
-                    println!(r#"{{"status":"non_interactive_denied"}}"#);
-                    std::process::exit(2);
-                }
-                ConfirmOutcome::NonInteractiveFallback(confirmed) => {
-                    println!(
-                        r#"{{"status":"non_interactive_fallback","confirmed":{}}}"#,
-                        confirmed
-                    );
-                    std::process::exit(if confirmed { 0 } else { 1 });
-                }
-                ConfirmOutcome::Cancelled => {
-                    println!(r#"{{"status":"cancelled"}}"#);
-                    std::process::exit(130);
-                }
-            }
+            let result = ConfirmResult::from_outcome(&outcome);
+            println!("{}", serde_json::to_string(&result)?);
+            ExitCode::from_confirm_outcome(&outcome).exit_process();
         }
         Command::Choice {
             prompt,
@@ -256,32 +266,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             let outcome = choice.select_with_config(&ctx.config)?;
-            match outcome {
-                ChoiceOutcome::Selected(item) => {
-                    println!(
-                        r#"{{"status":"selected","id":"{}","label":"{}"}}"#,
-                        item.id, item.label
-                    );
-                    std::process::exit(0);
-                }
-                ChoiceOutcome::NonInteractiveFallback(item) => {
-                    println!(
-                        r#"{{"status":"non_interactive_fallback","id":"{}","label":"{}"}}"#,
-                        item.id, item.label
-                    );
-                    std::process::exit(0);
-                }
-                ChoiceOutcome::NonInteractiveDenied => {
-                    println!(r#"{{"status":"non_interactive_denied"}}"#);
-                    std::process::exit(2);
-                }
-                ChoiceOutcome::Cancelled => {
-                    println!(r#"{{"status":"cancelled"}}"#);
-                    std::process::exit(130);
-                }
-            }
+            let result = ChoiceResult::from_outcome(&outcome);
+            println!("{}", serde_json::to_string(&result)?);
+            ExitCode::from_choice_outcome(&outcome).exit_process();
         }
     }
-
-    Ok(())
 }

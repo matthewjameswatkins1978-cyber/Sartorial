@@ -13,12 +13,7 @@ impl RenderHuman for Receipt {
         let badge = StatusBadge::new(self.status);
         badge.render_human(ctx, out)?;
         write!(out, " ")?;
-        HumanRenderer::write_styled(
-            out,
-            HumanRenderer::title_style(ctx.config.accent),
-            &self.title,
-            ctx.color_enabled,
-        )?;
+        HumanRenderer::write_styled(out, ctx.style.title_style(), &self.title, ctx.color_enabled)?;
         writeln!(out)?;
         writeln!(out)?;
 
@@ -34,7 +29,7 @@ impl RenderHuman for Receipt {
             writeln!(out)?;
             HumanRenderer::write_styled(
                 out,
-                HumanRenderer::muted_style(),
+                ctx.style.muted_style(),
                 "Unchanged:",
                 ctx.color_enabled,
             )?;
@@ -54,12 +49,7 @@ impl RenderHuman for Receipt {
 
         if let Some(ref guidance) = self.guidance {
             writeln!(out)?;
-            HumanRenderer::write_styled(
-                out,
-                HumanRenderer::value_style(),
-                guidance,
-                ctx.color_enabled,
-            )?;
+            HumanRenderer::write_styled(out, ctx.style.value_style(), guidance, ctx.color_enabled)?;
             writeln!(out)?;
         }
 

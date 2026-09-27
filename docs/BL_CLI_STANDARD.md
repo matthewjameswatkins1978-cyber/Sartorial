@@ -220,11 +220,12 @@ Output channels must be deliberate and segregated:
 ## 9. Semantic Exit Contract
 
 Downstream applications consume typed exit codes adhering to cross-platform conventions:
-- `0`: Success (POSIX standard).
-- `2`: Invalid request / command line usage error.
+- `0`: Success (POSIX standard, affirmative response).
+- `1`: Declined (User explicitly denied or answered negatively, e.g. confirm "no").
+- `2`: Invalid request / command line usage error / protocol schema version mismatch.
 - `3`: Requested capability or environment dependency unavailable.
-- `4`: Verification or primary operation failed.
-- `130`: Interrupted or cancelled by user (`SIGINT`).
+- `4`: Verification check or core operation failed, or non-interactive request denied without fallback.
+- `130`: Interrupted or cancelled by user (`SIGINT` / Esc).
 
 ---
 
@@ -273,3 +274,24 @@ An application may deviate from Sartorial defaults **only** when:
 2. The user has explicitly selected custom branding colors (configured via `Config::with_accent(...)`).
 
 Standard CLI output, inventory lists, status reports, and error messages should **not** invent new visual layouts or color schemes.
+
+---
+
+## 15. Language-Neutral Driver & Protocol Versioning
+
+Sartorial provides a language-neutral CLI executable (`sartorial`) enabling non-Rust programs (Python, Node, Go, C#, OCaml, shell scripts) to consume the full presentation system.
+
+### Protocol Schema Versioning
+- Canonical schema version: `sartorial.v0.1`
+- Top-level schema version is required on all inbound JSON rendering envelopes.
+- Streaming JSONL progress events support optional or defaulted `schema_version`.
+- If an unsupported schema version is provided, Sartorial rejects the input with exit code `2` (`UsageError`) and the error:
+  `unsupported protocol schema_version: got <version>, expected sartorial.v0.1`
+
+### Structured Results
+External prompt commands (`sartorial confirm` and `sartorial choice`) emit strictly typed, machine-readable JSON via `ConfirmResult` and `ChoiceResult`. Output fields are safely serialized via `serde_json` to handle quotes, newlines, tabs, and Unicode without escaping defects.
+
+### Streaming JSONL
+- `sartorial stream`: drives live progress on attended terminals (10 Hz steady tick, zero repeated-line spam) and clean line-oriented bounded messages on non-TTY environments.
+- `sartorial stream --json`: emits normalized, validated canonical JSONL to STDOUT with zero bytes on STDERR.
+

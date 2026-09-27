@@ -13,12 +13,7 @@ impl RenderHuman for Plan {
         writeln!(out)?;
 
         if let Some(ref desc) = self.description {
-            HumanRenderer::write_styled(
-                out,
-                HumanRenderer::section_style(),
-                desc,
-                ctx.color_enabled,
-            )?;
+            HumanRenderer::write_styled(out, ctx.style.section_style(), desc, ctx.color_enabled)?;
             writeln!(out)?;
             writeln!(out)?;
         }
@@ -37,7 +32,7 @@ impl RenderHuman for Plan {
             write!(out, " ")?;
             HumanRenderer::write_styled(
                 out,
-                HumanRenderer::value_style(),
+                ctx.style.value_style(),
                 &change.target,
                 ctx.color_enabled,
             )?;
@@ -47,7 +42,7 @@ impl RenderHuman for Plan {
                 write!(out, "  ")?;
                 HumanRenderer::write_styled(
                     out,
-                    HumanRenderer::muted_style(),
+                    ctx.style.muted_style(),
                     detail,
                     ctx.color_enabled,
                 )?;

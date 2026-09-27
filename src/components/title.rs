@@ -29,14 +29,14 @@ impl RenderHuman for Title {
         let title_upper = self.name.to_uppercase();
         HumanRenderer::write_styled(
             out,
-            HumanRenderer::title_style(ctx.config.accent),
+            ctx.style.title_style(),
             &title_upper,
             ctx.color_enabled,
         )?;
 
         if let Some(ref ver) = self.version {
             write!(out, " ")?;
-            HumanRenderer::write_styled(out, HumanRenderer::muted_style(), ver, ctx.color_enabled)?;
+            HumanRenderer::write_styled(out, ctx.style.muted_style(), ver, ctx.color_enabled)?;
         }
         writeln!(out)
     }

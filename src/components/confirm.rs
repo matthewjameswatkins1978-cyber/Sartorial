@@ -115,25 +115,23 @@ impl RenderHuman for Confirm {
     fn render_human(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
         HumanRenderer::write_styled(
             out,
-            HumanRenderer::section_style(),
+            ctx.style.section_style(),
             &self.prompt,
             ctx.color_enabled,
         )?;
         write!(out, " ")?;
-        let hint = if self.default_value { "[Y/n]" } else { "[y/N]" };
-        HumanRenderer::write_styled(
-            out,
-            HumanRenderer::key_char_style(ctx.config.accent),
-            hint,
-            ctx.color_enabled,
-        )?;
+        let (open, close) = ctx.style.key_delimiters();
+        let inner = if self.default_value { "Y/n" } else { "y/N" };
+        let hint = format!("{open}{inner}{close}");
+        HumanRenderer::write_styled(out, ctx.style.key_char_style(), &hint, ctx.color_enabled)?;
         write!(out, " ")
     }
 }
 
 impl RenderPlain for Confirm {
-    fn render_plain(&self, _ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
-        let hint = if self.default_value { "[Y/n]" } else { "[y/N]" };
-        write!(out, "{} {hint} ", self.prompt)
+    fn render_plain(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
+        let (open, close) = ctx.style.key_delimiters();
+        let inner = if self.default_value { "Y/n" } else { "y/N" };
+        write!(out, "{} {open}{inner}{close} ", self.prompt)
     }
 }

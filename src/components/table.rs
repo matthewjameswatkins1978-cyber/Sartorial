@@ -140,7 +140,7 @@ impl RenderHuman for TableView {
             sec.render_human(ctx, out)?;
         }
 
-        let base_col_gap = if ctx.is_narrow() { 2 } else { 4 };
+        let base_col_gap = ctx.style.table_col_gap(ctx.is_narrow());
         let (widths, col_gap) = self.calculate_column_widths(ctx.width, base_col_gap);
         let active_cols: Vec<usize> = (0..widths.len()).filter(|&i| widths[i] > 0).collect();
 
@@ -152,7 +152,7 @@ impl RenderHuman for TableView {
             widths.iter().sum::<usize>() + (active_cols.len().saturating_sub(1) * col_gap);
         let rule_len = total_content_width.min(ctx.width);
 
-        if ctx.config.border == BorderStyle::Subtle {
+        if ctx.style.border == BorderStyle::Subtle {
             HumanRenderer::write_rule(out, ctx, rule_len)?;
         }
 
@@ -226,7 +226,7 @@ impl RenderPlain for TableView {
             sec.render_plain(ctx, out)?;
         }
 
-        let base_col_gap = if ctx.is_narrow() { 2 } else { 4 };
+        let base_col_gap = ctx.style.table_col_gap(ctx.is_narrow());
         let (widths, col_gap) = self.calculate_column_widths(ctx.width, base_col_gap);
         let active_cols: Vec<usize> = (0..widths.len()).filter(|&i| widths[i] > 0).collect();
 

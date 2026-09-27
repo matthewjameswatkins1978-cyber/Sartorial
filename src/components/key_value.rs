@@ -38,30 +38,31 @@ impl RenderHuman for KeyValueList {
         }
 
         let max_label_len = self.facts.iter().map(|f| f.name.width()).max().unwrap_or(0);
-        let pad_label = (max_label_len + 2).min(30);
+        let pad_spacing = ctx.style.key_value_padding();
+        let pad_label = (max_label_len + pad_spacing).min(30);
 
         for fact in &self.facts {
             if ctx.is_narrow() {
                 // Stacked format for narrow terminals (< 60 cols)
                 HumanRenderer::write_styled(
                     out,
-                    HumanRenderer::label_style(),
+                    ctx.style.label_style(),
                     &fact.name,
                     ctx.color_enabled,
                 )?;
                 writeln!(out, ":")?;
                 write!(out, "  ")?;
                 let val_style = if fact.muted {
-                    HumanRenderer::muted_style()
+                    ctx.style.muted_style()
                 } else {
-                    HumanRenderer::value_style()
+                    ctx.style.value_style()
                 };
                 HumanRenderer::write_styled(out, val_style, &fact.value, ctx.color_enabled)?;
                 if let Some(ref unit) = fact.unit {
                     write!(out, " ")?;
                     HumanRenderer::write_styled(
                         out,
-                        HumanRenderer::muted_style(),
+                        ctx.style.muted_style(),
                         unit,
                         ctx.color_enabled,
                     )?;
@@ -72,28 +73,28 @@ impl RenderHuman for KeyValueList {
                 let label_width = fact.name.width();
                 HumanRenderer::write_styled(
                     out,
-                    HumanRenderer::label_style(),
+                    ctx.style.label_style(),
                     &fact.name,
                     ctx.color_enabled,
                 )?;
                 let pad = if pad_label > label_width {
                     pad_label - label_width
                 } else {
-                    2
+                    pad_spacing
                 };
                 write!(out, "{}", " ".repeat(pad))?;
 
                 let val_style = if fact.muted {
-                    HumanRenderer::muted_style()
+                    ctx.style.muted_style()
                 } else {
-                    HumanRenderer::value_style()
+                    ctx.style.value_style()
                 };
                 HumanRenderer::write_styled(out, val_style, &fact.value, ctx.color_enabled)?;
                 if let Some(ref unit) = fact.unit {
                     write!(out, " ")?;
                     HumanRenderer::write_styled(
                         out,
-                        HumanRenderer::muted_style(),
+                        ctx.style.muted_style(),
                         unit,
                         ctx.color_enabled,
                     )?;
@@ -108,7 +109,8 @@ impl RenderHuman for KeyValueList {
 impl RenderPlain for KeyValueList {
     fn render_plain(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
         let max_label_len = self.facts.iter().map(|f| f.name.width()).max().unwrap_or(0);
-        let pad_label = (max_label_len + 2).min(30);
+        let pad_spacing = ctx.style.key_value_padding();
+        let pad_label = (max_label_len + pad_spacing).min(30);
 
         for fact in &self.facts {
             if ctx.is_narrow() {
@@ -118,7 +120,7 @@ impl RenderPlain for KeyValueList {
                 let pad = if pad_label > label_width {
                     pad_label - label_width
                 } else {
-                    2
+                    pad_spacing
                 };
                 let unit_suffix = fact
                     .unit

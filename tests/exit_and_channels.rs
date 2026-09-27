@@ -3,6 +3,7 @@ use sartorial::*;
 #[test]
 fn test_semantic_exit_code_contract() {
     assert_eq!(ExitCode::Success.as_i32(), 0);
+    assert_eq!(ExitCode::Declined.as_i32(), 1);
     assert_eq!(ExitCode::UsageError.as_i32(), 2);
     assert_eq!(ExitCode::Unavailable.as_i32(), 3);
     assert_eq!(ExitCode::Failed.as_i32(), 4);

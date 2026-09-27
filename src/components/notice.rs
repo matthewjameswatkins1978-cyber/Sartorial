@@ -28,7 +28,7 @@ impl RenderHuman for NoticeView {
             // Quiet info is just plain text or muted
             HumanRenderer::write_styled(
                 out,
-                HumanRenderer::muted_style(),
+                ctx.style.muted_style(),
                 &self.notice.message,
                 ctx.color_enabled,
             )?;
@@ -37,7 +37,7 @@ impl RenderHuman for NoticeView {
             write!(out, " ")?;
             HumanRenderer::write_styled(
                 out,
-                HumanRenderer::value_style(),
+                ctx.style.value_style(),
                 &self.notice.message,
                 ctx.color_enabled,
             )?;
@@ -45,12 +45,7 @@ impl RenderHuman for NoticeView {
 
         if let Some(ref detail) = self.notice.detail {
             write!(out, " ")?;
-            HumanRenderer::write_styled(
-                out,
-                HumanRenderer::muted_style(),
-                detail,
-                ctx.color_enabled,
-            )?;
+            HumanRenderer::write_styled(out, ctx.style.muted_style(), detail, ctx.color_enabled)?;
         }
         writeln!(out)
     }

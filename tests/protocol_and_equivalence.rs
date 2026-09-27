@@ -261,7 +261,7 @@ fn test_jsonl_progress_stream_deserialization() {
     }
 
     match &events[2] {
-        ProgressEvent::Finish { id, status } => {
+        ProgressEvent::Finish { id, status, .. } => {
             assert_eq!(id, "scan");
             assert_eq!(*status, Status::Ready);
         }

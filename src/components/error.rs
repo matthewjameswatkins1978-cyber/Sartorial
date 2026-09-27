@@ -32,12 +32,12 @@ impl RenderHuman for ErrorView {
 
         // 2. WHY? (Established cause or preserved uncertainty)
         if let Some(ref why) = self.error.why {
-            HumanRenderer::write_styled(out, HumanRenderer::value_style(), why, ctx.color_enabled)?;
+            HumanRenderer::write_styled(out, ctx.style.value_style(), why, ctx.color_enabled)?;
             writeln!(out)?;
         } else {
             HumanRenderer::write_styled(
                 out,
-                HumanRenderer::muted_style(),
+                ctx.style.muted_style(),
                 "Cause undetermined (no conclusive root cause established).",
                 ctx.color_enabled,
             )?;
@@ -51,7 +51,7 @@ impl RenderHuman for ErrorView {
                 if let Some(ref loc) = ev.location {
                     HumanRenderer::write_styled(
                         out,
-                        HumanRenderer::muted_style(),
+                        ctx.style.muted_style(),
                         loc,
                         ctx.color_enabled,
                     )?;
@@ -59,7 +59,7 @@ impl RenderHuman for ErrorView {
                 }
                 HumanRenderer::write_styled(
                     out,
-                    HumanRenderer::value_style(),
+                    ctx.style.value_style(),
                     &ev.summary,
                     ctx.color_enabled,
                 )?;
@@ -67,7 +67,7 @@ impl RenderHuman for ErrorView {
                 if let Some(ref handle) = ev.handle {
                     HumanRenderer::write_styled(
                         out,
-                        HumanRenderer::muted_style(),
+                        ctx.style.muted_style(),
                         &format!("Ref: {handle}"),
                         ctx.color_enabled,
                     )?;

@@ -484,10 +484,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Starting 1.5s live motion demonstration...");
             let mut pb =
                 ProgressBar::activity("Optimizing repository cache").with_subtask("building index");
-            pb.start_interactive(ctx.config.is_interactive());
+            pb.start_live(&ctx)?;
             std::thread::sleep(std::time::Duration::from_millis(1500));
-            pb.finish_with_status(Status::Ready);
-            render_visual(&pb, &ctx)?;
+            pb.finish_live(Status::Ready, &ctx)?;
         }
         DemoCommand::All => {
             println!("=== 1. SUMMARY SCREEN ===");

@@ -65,7 +65,15 @@ fn test_same_semantic_content_across_all_four_presets() {
         assert!(plain.contains("All checks passed"));
         assert!(plain.contains("Target"));
         assert!(plain.contains("Release"));
-        assert!(plain.contains("[Enter] Open"));
-        assert!(plain.contains("[Q] Quit"));
+        assert!(plain.contains("Open"));
+        assert!(plain.contains("Quit"));
+
+        if p == Preset::BlackTie {
+            assert!(plain.contains("(Enter) Open"));
+            assert!(plain.contains("(Q) Quit"));
+        } else {
+            assert!(plain.contains("[Enter] Open"));
+            assert!(plain.contains("[Q] Quit"));
+        }
     }
 }

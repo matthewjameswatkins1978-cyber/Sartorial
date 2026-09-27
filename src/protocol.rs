@@ -134,12 +134,93 @@ pub struct ChoicePayload {
     pub non_interactive_fallback: Option<usize>,
 }
 
-fn default_schema_version() -> String {
+pub fn default_schema_version() -> String {
     SARTORIAL_SCHEMA_VERSION.to_string()
 }
 
 fn default_true() -> bool {
     true
+}
+
+/// Protocol error type for inbound message validation.
+#[derive(Debug)]
+pub enum ProtocolError {
+    UnsupportedVersion { expected: String, actual: String },
+    Json(serde_json::Error),
+    Io(io::Error),
+}
+
+impl std::fmt::Display for ProtocolError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnsupportedVersion { expected, actual } => {
+                write!(
+                    f,
+                    "unsupported protocol schema_version: got {actual}, expected {expected}"
+                )
+            }
+            Self::Json(e) => write!(f, "Invalid JSON: {e}"),
+            Self::Io(e) => write!(f, "I/O error: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for ProtocolError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Json(e) => Some(e),
+            Self::Io(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl From<serde_json::Error> for ProtocolError {
+    fn from(e: serde_json::Error) -> Self {
+        Self::Json(e)
+    }
+}
+
+impl From<io::Error> for ProtocolError {
+    fn from(e: io::Error) -> Self {
+        Self::Io(e)
+    }
+}
+
+/// Centrally validate schema version boundary.
+pub fn validate_schema_version(version: &str) -> Result<(), ProtocolError> {
+    if version == SARTORIAL_SCHEMA_VERSION {
+        Ok(())
+    } else {
+        Err(ProtocolError::UnsupportedVersion {
+            expected: SARTORIAL_SCHEMA_VERSION.to_string(),
+            actual: version.to_string(),
+        })
+    }
+}
+
+impl ProtocolEnvelope {
+    pub fn schema_version(&self) -> &str {
+        match self {
+            Self::Summary(p) => &p.schema_version,
+            Self::Table(p) => &p.schema_version,
+            Self::Error(p) => &p.schema_version,
+            Self::Plan(p) => &p.schema_version,
+            Self::Receipt(p) => &p.schema_version,
+            Self::Confirm(p) => &p.schema_version,
+            Self::Choice(p) => &p.schema_version,
+        }
+    }
+
+    pub fn validate_version(&self) -> Result<(), ProtocolError> {
+        validate_schema_version(self.schema_version())
+    }
+
+    pub fn from_json_str(s: &str) -> Result<Self, ProtocolError> {
+        let envelope: Self = serde_json::from_str(s)?;
+        envelope.validate_version()?;
+        Ok(envelope)
+    }
 }
 
 /// Streaming JSONL progress event for language-neutral live updates.
@@ -148,6 +229,8 @@ fn default_true() -> bool {
 pub enum ProgressEvent {
     #[serde(rename = "progress.start")]
     Start {
+        #[serde(default = "default_schema_version")]
+        schema_version: String,
         id: String,
         activity: String,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -159,6 +242,8 @@ pub enum ProgressEvent {
     },
     #[serde(rename = "progress.update")]
     Update {
+        #[serde(default = "default_schema_version")]
+        schema_version: String,
         id: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         current: Option<u64>,
@@ -173,10 +258,148 @@ pub enum ProgressEvent {
     },
     #[serde(rename = "progress.finish")]
     Finish {
+        #[serde(default = "default_schema_version")]
+        schema_version: String,
         id: String,
         #[serde(default = "default_ready_status")]
         status: Status,
     },
+}
+
+impl ProgressEvent {
+    pub fn schema_version(&self) -> &str {
+        match self {
+            Self::Start { schema_version, .. } => schema_version,
+            Self::Update { schema_version, .. } => schema_version,
+            Self::Finish { schema_version, .. } => schema_version,
+        }
+    }
+
+    pub fn validate_version(&self) -> Result<(), ProtocolError> {
+        validate_schema_version(self.schema_version())
+    }
+
+    pub fn from_json_str(s: &str) -> Result<Self, ProtocolError> {
+        let event: Self = serde_json::from_str(s)?;
+        event.validate_version()?;
+        Ok(event)
+    }
+}
+
+/// Typed result payload for external `sartorial confirm` invocations.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConfirmResult {
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub confirmed: Option<bool>,
+}
+
+impl ConfirmResult {
+    pub fn confirmed() -> Self {
+        Self {
+            status: "confirmed".to_string(),
+            confirmed: None,
+        }
+    }
+
+    pub fn denied() -> Self {
+        Self {
+            status: "denied".to_string(),
+            confirmed: None,
+        }
+    }
+
+    pub fn non_interactive_fallback(confirmed: bool) -> Self {
+        Self {
+            status: "non_interactive_fallback".to_string(),
+            confirmed: Some(confirmed),
+        }
+    }
+
+    pub fn non_interactive_denied() -> Self {
+        Self {
+            status: "non_interactive_denied".to_string(),
+            confirmed: None,
+        }
+    }
+
+    pub fn cancelled() -> Self {
+        Self {
+            status: "cancelled".to_string(),
+            confirmed: None,
+        }
+    }
+
+    pub fn from_outcome(outcome: &crate::components::confirm::ConfirmOutcome) -> Self {
+        use crate::components::confirm::ConfirmOutcome;
+        match outcome {
+            ConfirmOutcome::Confirmed => Self::confirmed(),
+            ConfirmOutcome::Denied => Self::denied(),
+            ConfirmOutcome::NonInteractiveFallback(c) => Self::non_interactive_fallback(*c),
+            ConfirmOutcome::NonInteractiveDenied => Self::non_interactive_denied(),
+            ConfirmOutcome::Cancelled => Self::cancelled(),
+        }
+    }
+
+    pub fn is_confirmed(&self) -> bool {
+        self.status == "confirmed" || self.confirmed == Some(true)
+    }
+}
+
+/// Typed result payload for external `sartorial choice` invocations.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChoiceResult {
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+}
+
+impl ChoiceResult {
+    pub fn selected(id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            status: "selected".to_string(),
+            id: Some(id.into()),
+            label: Some(label.into()),
+        }
+    }
+
+    pub fn non_interactive_fallback(id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            status: "non_interactive_fallback".to_string(),
+            id: Some(id.into()),
+            label: Some(label.into()),
+        }
+    }
+
+    pub fn non_interactive_denied() -> Self {
+        Self {
+            status: "non_interactive_denied".to_string(),
+            id: None,
+            label: None,
+        }
+    }
+
+    pub fn cancelled() -> Self {
+        Self {
+            status: "cancelled".to_string(),
+            id: None,
+            label: None,
+        }
+    }
+
+    pub fn from_outcome(outcome: &crate::components::choice::ChoiceOutcome) -> Self {
+        use crate::components::choice::ChoiceOutcome;
+        match outcome {
+            ChoiceOutcome::Selected(item) => Self::selected(&item.id, &item.label),
+            ChoiceOutcome::NonInteractiveFallback(item) => {
+                Self::non_interactive_fallback(&item.id, &item.label)
+            }
+            ChoiceOutcome::NonInteractiveDenied => Self::non_interactive_denied(),
+            ChoiceOutcome::Cancelled => Self::cancelled(),
+        }
+    }
 }
 
 fn default_ready_status() -> Status {

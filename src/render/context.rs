@@ -126,4 +126,21 @@ impl RenderContext {
     pub fn is_wide(&self) -> bool {
         self.width_category() == WidthCategory::Wide
     }
+
+    /// Single authority deciding whether motion/progress animation is permitted.
+    ///
+    /// Respects:
+    /// - `Config::motion` (Auto, Always, Never)
+    /// - `AccessibilityMode` (reduced motion suppression)
+    /// - `RenderTarget` (plain text and agent JSON suppression)
+    /// - TTY capability (non-interactive streams suppression)
+    pub fn should_animate(&self, is_tty: bool) -> bool {
+        let reduced_motion = self.config.accessibility.is_reduced_motion();
+        self.config.motion.should_animate(
+            is_tty,
+            self.target.is_agent(),
+            self.target.is_plain(),
+            reduced_motion,
+        )
+    }
 }

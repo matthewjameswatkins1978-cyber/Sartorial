@@ -82,12 +82,7 @@ impl RenderHuman for HelpView {
         writeln!(out)?;
 
         if let Some(ref desc) = self.description {
-            HumanRenderer::write_styled(
-                out,
-                HumanRenderer::muted_style(),
-                desc,
-                ctx.color_enabled,
-            )?;
+            HumanRenderer::write_styled(out, ctx.style.muted_style(), desc, ctx.color_enabled)?;
             writeln!(out)?;
             writeln!(out)?;
         }
@@ -96,12 +91,7 @@ impl RenderHuman for HelpView {
         let sec_usage = Section::new("USAGE");
         sec_usage.render_human(ctx, out)?;
         write!(out, "  ")?;
-        HumanRenderer::write_styled(
-            out,
-            HumanRenderer::value_style(),
-            &self.usage,
-            ctx.color_enabled,
-        )?;
+        HumanRenderer::write_styled(out, ctx.style.value_style(), &self.usage, ctx.color_enabled)?;
         writeln!(out)?;
         writeln!(out)?;
 
@@ -122,13 +112,13 @@ impl RenderHuman for HelpView {
                 write!(out, "  ")?;
                 HumanRenderer::write_styled(
                     out,
-                    HumanRenderer::key_char_style(ctx.config.accent),
+                    ctx.style.key_char_style(),
                     &format!("{:<width$}", cmd.name, width = max_name + 2),
                     ctx.color_enabled,
                 )?;
                 HumanRenderer::write_styled(
                     out,
-                    HumanRenderer::muted_style(),
+                    ctx.style.muted_style(),
                     &cmd.description,
                     ctx.color_enabled,
                 )?;
@@ -154,13 +144,13 @@ impl RenderHuman for HelpView {
                 write!(out, "  ")?;
                 HumanRenderer::write_styled(
                     out,
-                    HumanRenderer::value_style(),
+                    ctx.style.value_style(),
                     &format!("{:<width$}", opt.name, width = max_flag + 2),
                     ctx.color_enabled,
                 )?;
                 HumanRenderer::write_styled(
                     out,
-                    HumanRenderer::muted_style(),
+                    ctx.style.muted_style(),
                     &opt.description,
                     ctx.color_enabled,
                 )?;
@@ -176,12 +166,7 @@ impl RenderHuman for HelpView {
 
             for ex in &self.examples {
                 write!(out, "  ")?;
-                HumanRenderer::write_styled(
-                    out,
-                    HumanRenderer::value_style(),
-                    ex,
-                    ctx.color_enabled,
-                )?;
+                HumanRenderer::write_styled(out, ctx.style.value_style(), ex, ctx.color_enabled)?;
                 writeln!(out)?;
             }
             writeln!(out)?;

@@ -188,16 +188,16 @@ impl RenderHuman for Choice {
 
             let marker_style = if is_selected {
                 anstyle::Style::new()
-                    .fg_color(Some(ctx.config.accent.into()))
+                    .fg_color(Some(ctx.style.accent.into()))
                     .effects(anstyle::Effects::BOLD)
             } else {
-                HumanRenderer::muted_style()
+                ctx.style.muted_style()
             };
 
             HumanRenderer::write_styled(out, marker_style, marker, ctx.color_enabled)?;
             HumanRenderer::write_styled(
                 out,
-                HumanRenderer::muted_style(),
+                ctx.style.muted_style(),
                 &format!("{}. ", idx + 1),
                 ctx.color_enabled,
             )?;
@@ -205,18 +205,13 @@ impl RenderHuman for Choice {
             let label_style = if is_selected {
                 anstyle::Style::new().effects(anstyle::Effects::BOLD)
             } else {
-                HumanRenderer::value_style()
+                ctx.style.value_style()
             };
             HumanRenderer::write_styled(out, label_style, &item.label, ctx.color_enabled)?;
 
             if let Some(ref desc) = item.description {
                 write!(out, "  ")?;
-                HumanRenderer::write_styled(
-                    out,
-                    HumanRenderer::muted_style(),
-                    desc,
-                    ctx.color_enabled,
-                )?;
+                HumanRenderer::write_styled(out, ctx.style.muted_style(), desc, ctx.color_enabled)?;
             }
             writeln!(out)?;
         }

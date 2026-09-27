@@ -115,9 +115,9 @@ impl ResolvedStyle {
             return Style::new().effects(Effects::BOLD);
         }
         match self.preset {
-            Preset::BlackTie => Style::new()
+            Preset::Studio => Style::new()
                 .fg_color(Some(self.accent.into()))
-                .effects(Effects::BOLD),
+                .effects(Effects::BOLD | Effects::UNDERLINE),
             _ => Style::new()
                 .fg_color(Some(self.accent.into()))
                 .effects(Effects::BOLD),
@@ -125,14 +125,28 @@ impl ResolvedStyle {
     }
 
     pub fn section_style(&self) -> Style {
-        Style::new().effects(Effects::BOLD)
+        if !self.color_enabled {
+            return Style::new().effects(Effects::BOLD);
+        }
+        match self.preset {
+            Preset::Workwear => Style::new()
+                .fg_color(Some(self.accent.into()))
+                .effects(Effects::BOLD),
+            Preset::Studio => Style::new()
+                .fg_color(Some(self.accent.into()))
+                .effects(Effects::BOLD),
+            _ => Style::new().effects(Effects::BOLD),
+        }
     }
 
     pub fn label_style(&self) -> Style {
         if !self.color_enabled {
             return Style::new();
         }
-        Style::new().fg_color(Some(AnsiColor::BrightBlack.into()))
+        match self.preset {
+            Preset::BlackTie => Style::new().fg_color(Some(AnsiColor::White.into())),
+            _ => Style::new().fg_color(Some(AnsiColor::BrightBlack.into())),
+        }
     }
 
     pub fn value_style(&self) -> Style {
@@ -143,7 +157,10 @@ impl ResolvedStyle {
         if !self.color_enabled {
             return Style::new();
         }
-        Style::new().fg_color(Some(AnsiColor::BrightBlack.into()))
+        match self.preset {
+            Preset::BlackTie => Style::new().fg_color(Some(AnsiColor::White.into())),
+            _ => Style::new().fg_color(Some(AnsiColor::BrightBlack.into())),
+        }
     }
 
     pub fn key_char_style(&self) -> Style {
@@ -166,6 +183,60 @@ impl ResolvedStyle {
         if !self.color_enabled {
             return Style::new();
         }
-        Style::new().fg_color(Some(AnsiColor::BrightBlack.into()))
+        match self.preset {
+            Preset::Workwear => Style::new().fg_color(Some(self.accent.into())),
+            _ => Style::new().fg_color(Some(AnsiColor::BrightBlack.into())),
+        }
+    }
+
+    /// Spacing between action items in keyboard action bars.
+    pub fn action_gap(&self, is_narrow: bool) -> usize {
+        if is_narrow {
+            2.min(self.action_spacing)
+        } else {
+            self.action_spacing
+        }
+    }
+
+    /// Spacing between table columns.
+    pub fn table_col_gap(&self, is_narrow: bool) -> usize {
+        if is_narrow {
+            match self.density {
+                Density::Compact => 1,
+                Density::Standard => 2,
+                Density::Roomy => 3,
+            }
+        } else {
+            match self.density {
+                Density::Compact => 2,
+                Density::Standard => 4,
+                Density::Roomy => 5,
+            }
+        }
+    }
+
+    /// Horizontal padding for key-value fact labels.
+    pub fn key_value_padding(&self) -> usize {
+        match self.density {
+            Density::Compact => 1,
+            Density::Standard => 2,
+            Density::Roomy => 4,
+        }
+    }
+
+    /// Section header formatting helper.
+    pub fn format_section_header(&self, title: &str) -> String {
+        match self.preset {
+            Preset::Workwear => format!("» {title}"),
+            _ => title.to_string(),
+        }
+    }
+
+    /// Action key bracket pair: (open, close).
+    pub fn key_delimiters(&self) -> (&'static str, &'static str) {
+        match self.preset {
+            Preset::BlackTie => ("(", ")"),
+            _ => ("[", "]"),
+        }
     }
 }

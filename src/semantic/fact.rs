@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Fact {
     /// The name/label of the fact (e.g. "Environment", "Version").
+    #[serde(alias = "key")]
     pub name: String,
     /// The textual value of the fact (e.g. "x86_64", "2.51.0").
     pub value: String,
