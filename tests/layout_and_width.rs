@@ -13,7 +13,7 @@ fn test_narrow_terminal_stacking() {
     // Narrow context (< 60 columns)
     let narrow_ctx = RenderContext::plain().with_width(45);
     assert!(narrow_ctx.is_narrow());
-    let narrow_output = kv.to_plain_string(&narrow_ctx);
+    let narrow_output = kv.to_plain_string(&narrow_ctx).unwrap();
 
     // In narrow mode, label is stacked on its own line followed by indented value
     assert!(narrow_output.contains(
@@ -23,7 +23,7 @@ fn test_narrow_terminal_stacking() {
     // Normal context (80 columns)
     let normal_ctx = RenderContext::plain().with_width(80);
     assert!(!normal_ctx.is_narrow());
-    let normal_output = kv.to_plain_string(&normal_ctx);
+    let normal_output = kv.to_plain_string(&normal_ctx).unwrap();
     // In normal mode, aligned on same line
     assert!(normal_output.contains(
         "Application Data Directory  C:\\Program Files\\Biscuit Logic\\App Data\\Config"
@@ -38,7 +38,7 @@ fn test_paths_with_spaces() {
 
     let detail = DetailView::new("Path Resolution", evidence);
     let ctx = RenderContext::plain();
-    let output = detail.to_plain_string(&ctx);
+    let output = detail.to_plain_string(&ctx).unwrap();
 
     assert!(output.contains("C:\\Program Files\\Common Files\\System Utilities\\runner.exe"));
     assert!(output.contains("Binary resolved"));
@@ -61,11 +61,23 @@ fn test_unicode_and_ascii_symbol_modes() {
             .with_color(ColorChoice::Never),
     );
 
-    assert_eq!(ready_badge.to_human_string(&unicode_ctx), "✓ READY");
-    assert_eq!(ready_badge.to_human_string(&ascii_ctx), "[OK] READY");
+    assert_eq!(
+        ready_badge.to_human_string(&unicode_ctx).unwrap(),
+        "✓ READY"
+    );
+    assert_eq!(
+        ready_badge.to_human_string(&ascii_ctx).unwrap(),
+        "[OK] READY"
+    );
 
-    assert_eq!(failed_badge.to_human_string(&unicode_ctx), "× FAILED");
-    assert_eq!(failed_badge.to_human_string(&ascii_ctx), "[X] FAILED");
+    assert_eq!(
+        failed_badge.to_human_string(&unicode_ctx).unwrap(),
+        "× FAILED"
+    );
+    assert_eq!(
+        failed_badge.to_human_string(&ascii_ctx).unwrap(),
+        "[X] FAILED"
+    );
 }
 
 #[test]
@@ -79,7 +91,7 @@ fn test_hostile_long_cells_narrow_table_enforces_width() {
 
     // Hostile narrow width: only 40 columns
     let ctx = RenderContext::plain().with_width(40);
-    let plain_output = view.to_plain_string(&ctx);
+    let plain_output = view.to_plain_string(&ctx).unwrap();
 
     // Verify EVERY line strictly conforms to width <= 40
     for line in plain_output.lines() {
@@ -103,7 +115,7 @@ fn test_unicode_cjk_width_handling() {
 
     let view = TableView::new(table);
     let ctx = RenderContext::plain().with_width(45);
-    let plain_output = view.to_plain_string(&ctx);
+    let plain_output = view.to_plain_string(&ctx).unwrap();
 
     for line in plain_output.lines() {
         let display_width = UnicodeWidthStr::width(line);

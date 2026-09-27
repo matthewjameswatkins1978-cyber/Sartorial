@@ -30,14 +30,14 @@ fn test_same_semantic_truth_across_three_targets() {
     // 1. Human view
     let human_ctx =
         RenderContext::detect().with_config(Config::new().with_color(ColorChoice::Never));
-    let human_str = outcome.to_human_string(&human_ctx);
+    let human_str = outcome.to_human_string(&human_ctx).unwrap();
     assert!(human_str.contains("ENVIRONMENT CHECK"));
     assert!(human_str.contains("Windows 11"));
     assert!(human_str.contains("[Enter] Open"));
 
     // 2. Plain view
     let plain_ctx = RenderContext::plain();
-    let plain_str = outcome.to_plain_string(&plain_ctx);
+    let plain_str = outcome.to_plain_string(&plain_ctx).unwrap();
     assert!(!plain_str.contains("\x1b["));
     assert!(plain_str.contains("ENVIRONMENT CHECK"));
     assert!(plain_str.contains("Windows 11"));
@@ -63,7 +63,7 @@ fn test_plain_rendering_is_pipe_safe() {
 
     let view = TableView::new(table);
     let ctx = RenderContext::plain();
-    let plain = view.to_plain_string(&ctx);
+    let plain = view.to_plain_string(&ctx).unwrap();
 
     // Absolutely no ANSI escape sequences
     assert!(!plain.contains("\x1b"));

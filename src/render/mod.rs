@@ -16,10 +16,10 @@ use std::io::{self, Write};
 pub trait RenderHuman {
     fn render_human(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()>;
 
-    fn to_human_string(&self, ctx: &RenderContext) -> String {
+    fn to_human_string(&self, ctx: &RenderContext) -> io::Result<String> {
         let mut buf = Vec::new();
-        let _ = self.render_human(ctx, &mut buf);
-        String::from_utf8_lossy(&buf).into_owned()
+        self.render_human(ctx, &mut buf)?;
+        Ok(String::from_utf8_lossy(&buf).into_owned())
     }
 }
 
@@ -27,10 +27,10 @@ pub trait RenderHuman {
 pub trait RenderPlain {
     fn render_plain(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()>;
 
-    fn to_plain_string(&self, ctx: &RenderContext) -> String {
+    fn to_plain_string(&self, ctx: &RenderContext) -> io::Result<String> {
         let mut buf = Vec::new();
-        let _ = self.render_plain(ctx, &mut buf);
-        String::from_utf8_lossy(&buf).into_owned()
+        self.render_plain(ctx, &mut buf)?;
+        Ok(String::from_utf8_lossy(&buf).into_owned())
     }
 }
 

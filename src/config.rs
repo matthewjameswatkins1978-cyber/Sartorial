@@ -105,10 +105,18 @@ impl InteractiveMode {
     }
 }
 
+use crate::accessibility::AccessibilityMode;
+use crate::motion::MotionMode;
+use crate::pager::PagerMode;
+use crate::style::{Preset, ProgressTreatment, ResolvedStyle};
+use crate::verbosity::Verbosity;
+
 /// Sartorial configuration embodying the Biscuit Logic CLI Presentation Standard.
 #[derive(Debug, Clone)]
 pub struct Config {
-    /// Restrained accent color (default is subtle Cyan/Slate).
+    /// Active visual preset (default is House).
+    pub preset: Preset,
+    /// Restrained accent color.
     pub accent: anstyle::AnsiColor,
     /// Layout density.
     pub density: Density,
@@ -120,28 +128,50 @@ pub struct Config {
     pub color: ColorChoice,
     /// Interactive mode.
     pub interactive: InteractiveMode,
+    /// Motion policy.
+    pub motion: MotionMode,
+    /// Accessibility mode.
+    pub accessibility: AccessibilityMode,
+    /// Verbosity policy.
+    pub verbosity: Verbosity,
+    /// Paging policy.
+    pub pager: PagerMode,
     /// Terminal width override (if None, detected automatically).
     pub width: Option<usize>,
 }
 
 impl Default for Config {
     fn default() -> Self {
+        let preset = Preset::House;
         Self {
-            accent: anstyle::AnsiColor::Cyan,
-            density: Density::Standard,
+            preset,
+            accent: preset.default_accent(),
+            density: preset.default_density(),
             border: BorderStyle::Subtle,
             symbols: SymbolMode::Auto,
             color: ColorChoice::Auto,
             interactive: InteractiveMode::Auto,
+            motion: MotionMode::Auto,
+            accessibility: AccessibilityMode::Auto,
+            verbosity: Verbosity::Normal,
+            pager: PagerMode::Auto,
             width: None,
         }
     }
 }
 
 impl Config {
-    /// Create a quiet, default configuration.
+    /// Create a quiet, default configuration (House preset).
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Select one of the four first-party presets: House, BlackTie, Workwear, Studio.
+    pub fn with_preset(mut self, preset: Preset) -> Self {
+        self.preset = preset;
+        self.accent = preset.default_accent();
+        self.density = preset.default_density();
+        self
     }
 
     /// Set a custom accent color (escape hatch for brand adaptation).
@@ -180,6 +210,30 @@ impl Config {
         self
     }
 
+    /// Set motion policy.
+    pub fn with_motion(mut self, motion: MotionMode) -> Self {
+        self.motion = motion;
+        self
+    }
+
+    /// Set accessibility policy.
+    pub fn with_accessibility(mut self, accessibility: AccessibilityMode) -> Self {
+        self.accessibility = accessibility;
+        self
+    }
+
+    /// Set verbosity policy.
+    pub fn with_verbosity(mut self, verbosity: Verbosity) -> Self {
+        self.verbosity = verbosity;
+        self
+    }
+
+    /// Set paging policy.
+    pub fn with_pager(mut self, pager: PagerMode) -> Self {
+        self.pager = pager;
+        self
+    }
+
     /// Set an explicit terminal width (useful for testing or fixed width rendering).
     pub fn with_width(mut self, width: usize) -> Self {
         self.width = Some(width);
@@ -193,5 +247,36 @@ impl Config {
             std::io::stdin().is_terminal(),
             std::io::stdout().is_terminal(),
         )
+    }
+
+    /// Resolves configuration into a concrete, consistent presentation authority.
+    pub fn resolve_style(&self, is_tty: bool) -> ResolvedStyle {
+        let symbols = if self.accessibility.is_plain() {
+            SymbolMode::Ascii
+        } else {
+            self.symbols.resolve(is_tty)
+        };
+
+        let color_enabled =
+            self.color.should_render_color(is_tty) && !self.accessibility.is_plain();
+
+        let progress_treatment = match self.preset {
+            Preset::House => ProgressTreatment::Restrained,
+            Preset::BlackTie => ProgressTreatment::Minimal,
+            Preset::Workwear => ProgressTreatment::Numeric,
+            Preset::Studio => ProgressTreatment::Expressive,
+        };
+
+        ResolvedStyle {
+            preset: self.preset,
+            accent: self.accent,
+            density: self.density,
+            border: self.border,
+            symbols,
+            action_spacing: self.preset.action_spacing(),
+            rule_char: self.preset.rule_char(symbols),
+            progress_treatment,
+            color_enabled,
+        }
     }
 }

@@ -1,5 +1,6 @@
 use crate::config::{Config, SymbolMode};
 use crate::render::target::RenderTarget;
+use crate::style::ResolvedStyle;
 use std::io::IsTerminal;
 
 /// Width categorization according to Biscuit Logic responsiveness guidelines.
@@ -13,7 +14,7 @@ pub enum WidthCategory {
     Wide,
 }
 
-/// Rendering context providing display boundaries, capabilities, and settings.
+/// Rendering context providing display boundaries, capabilities, settings, and resolved style.
 #[derive(Debug, Clone)]
 pub struct RenderContext {
     pub target: RenderTarget,
@@ -21,6 +22,7 @@ pub struct RenderContext {
     pub config: Config,
     pub color_enabled: bool,
     pub symbols: SymbolMode,
+    pub style: ResolvedStyle,
 }
 
 impl Default for RenderContext {
@@ -34,8 +36,9 @@ impl RenderContext {
     pub fn detect() -> Self {
         let is_tty = std::io::stdout().is_terminal();
         let config = Config::default();
-        let color_enabled = config.color.should_render_color(is_tty);
-        let symbols = config.symbols.resolve(is_tty);
+        let style = config.resolve_style(is_tty);
+        let color_enabled = style.color_enabled;
+        let symbols = style.symbols;
         let width = config.width.unwrap_or_else(|| {
             crossterm::terminal::size()
                 .map(|(w, _)| w as usize)
@@ -48,6 +51,7 @@ impl RenderContext {
             config,
             color_enabled,
             symbols,
+            style,
         }
     }
 
@@ -57,6 +61,8 @@ impl RenderContext {
         ctx.target = RenderTarget::Plain;
         ctx.color_enabled = false;
         ctx.symbols = SymbolMode::Ascii;
+        ctx.style.color_enabled = false;
+        ctx.style.symbols = SymbolMode::Ascii;
         ctx
     }
 
@@ -65,14 +71,16 @@ impl RenderContext {
         let mut ctx = Self::detect();
         ctx.target = RenderTarget::Agent;
         ctx.color_enabled = false;
+        ctx.style.color_enabled = false;
         ctx
     }
 
     /// Set an explicit configuration.
     pub fn with_config(mut self, config: Config) -> Self {
         let is_tty = std::io::stdout().is_terminal();
-        self.color_enabled = config.color.should_render_color(is_tty);
-        self.symbols = config.symbols.resolve(is_tty);
+        self.style = config.resolve_style(is_tty);
+        self.color_enabled = self.style.color_enabled;
+        self.symbols = self.style.symbols;
         if let Some(w) = config.width {
             self.width = w;
         }
@@ -83,8 +91,13 @@ impl RenderContext {
     /// Set an explicit target.
     pub fn with_target(mut self, target: RenderTarget) -> Self {
         self.target = target;
-        if target.is_plain() {
+        if target.is_plain() || target.is_agent() {
             self.color_enabled = false;
+            self.style.color_enabled = false;
+        }
+        if target.is_plain() {
+            self.symbols = SymbolMode::Ascii;
+            self.style.symbols = SymbolMode::Ascii;
         }
         self
     }

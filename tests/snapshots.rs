@@ -19,7 +19,7 @@ fn test_summary_screen_snapshot_plain() {
         .action(Action::quit());
 
     let ctx = RenderContext::plain().with_width(60);
-    let plain_out = screen.to_plain_string(&ctx);
+    let plain_out = screen.to_plain_string(&ctx).unwrap();
 
     let expected = "\
 SARTORIAL
@@ -53,7 +53,7 @@ fn test_error_view_snapshot_plain() {
         .with_action(Action::details());
 
     let ctx = RenderContext::plain();
-    let plain_out = err.to_plain_string(&ctx);
+    let plain_out = err.to_plain_string(&ctx).unwrap();
 
     let expected = "\
 THREADMOTH NOT VISIBLE

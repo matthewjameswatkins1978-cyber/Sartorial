@@ -16,6 +16,7 @@ unicode-width = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 clap = { version = "4.5", features = ["derive"], optional = true }
+clap_complete = { version = "4.5", optional = true }
 
 [dev-dependencies]
 clap = { version = "4.5", features = ["derive"] }
@@ -24,6 +25,12 @@ tempfile = "3.17"
 [features]
 default = ["clap"]
 clap = ["dep:clap"]
+completions = ["dep:clap_complete", "clap"]
+
+[[bin]]
+name = "sartorial"
+path = "src/bin/sartorial.rs"
+required-features = ["clap"]
 
 [[bin]]
 name = "sartorial-demo"

@@ -50,7 +50,7 @@ fn test_action_bar_rendering() {
         .with_action(Action::quit());
 
     let ctx = RenderContext::plain();
-    let rendered = bar.to_plain_string(&ctx);
+    let rendered = bar.to_plain_string(&ctx).unwrap();
 
     assert!(rendered.contains("[I] Install"));
     assert!(rendered.contains("[/] Find"));

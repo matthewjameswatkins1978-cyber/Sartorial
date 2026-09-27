@@ -1,0 +1,416 @@
+use crate::components::choice::Choice;
+use crate::components::confirm::Confirm;
+use crate::components::error::ErrorView;
+use crate::components::table::TableView;
+use crate::render::context::RenderContext;
+use crate::render::{RenderAgent, RenderHuman, RenderPlain, SARTORIAL_SCHEMA_VERSION};
+use crate::screens::summary::SummaryScreen;
+use crate::semantic::action::Action;
+use crate::semantic::choice::ChoiceItem;
+use crate::semantic::error::ErrorModel;
+use crate::semantic::evidence::Evidence;
+use crate::semantic::fact::Fact;
+use crate::semantic::notice::Notice;
+use crate::semantic::plan::{Plan, PlanChange};
+use crate::semantic::receipt::Receipt;
+use crate::semantic::status::Status;
+use crate::semantic::table::TableModel;
+use serde::{Deserialize, Serialize};
+use std::io::{self, Write};
+
+/// Top-level protocol envelope for language-neutral Sartorial messages.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ProtocolEnvelope {
+    Summary(SummaryPayload),
+    Table(TablePayload),
+    Error(ErrorPayload),
+    Plan(PlanPayload),
+    Receipt(ReceiptPayload),
+    Confirm(ConfirmPayload),
+    Choice(ChoicePayload),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SummaryPayload {
+    #[serde(default = "default_schema_version")]
+    pub schema_version: String,
+    pub title: String,
+    pub status: Status,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subtitle: Option<String>,
+    #[serde(default)]
+    pub facts: Vec<Fact>,
+    #[serde(default)]
+    pub notices: Vec<Notice>,
+    #[serde(default)]
+    pub actions: Vec<Action>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TablePayload {
+    #[serde(default = "default_schema_version")]
+    pub schema_version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub badge: Option<String>,
+    pub headers: Vec<String>,
+    pub rows: Vec<Vec<String>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ErrorPayload {
+    #[serde(default = "default_schema_version")]
+    pub schema_version: String,
+    pub what: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub why: Option<String>,
+    #[serde(default)]
+    pub evidence: Vec<Evidence>,
+    #[serde(default)]
+    pub actions: Vec<Action>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlanPayload {
+    #[serde(default = "default_schema_version")]
+    pub schema_version: String,
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub changes: Vec<PlanChange>,
+    #[serde(default)]
+    pub consequences: Vec<String>,
+    #[serde(default)]
+    pub warnings: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reversible: Option<bool>,
+    #[serde(default)]
+    pub actions: Vec<Action>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReceiptPayload {
+    #[serde(default = "default_schema_version")]
+    pub schema_version: String,
+    pub title: String,
+    pub status: Status,
+    #[serde(default)]
+    pub changes: Vec<Fact>,
+    #[serde(default)]
+    pub unchanged: Vec<Fact>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guidance: Option<String>,
+    #[serde(default)]
+    pub warnings: Vec<Notice>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evidence_handle: Option<String>,
+    #[serde(default)]
+    pub actions: Vec<Action>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConfirmPayload {
+    #[serde(default = "default_schema_version")]
+    pub schema_version: String,
+    pub prompt: String,
+    #[serde(default = "default_true")]
+    pub default: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub non_interactive_fallback: Option<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChoicePayload {
+    #[serde(default = "default_schema_version")]
+    pub schema_version: String,
+    pub prompt: String,
+    pub items: Vec<ChoiceItem>,
+    #[serde(default)]
+    pub default_index: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub non_interactive_fallback: Option<usize>,
+}
+
+fn default_schema_version() -> String {
+    SARTORIAL_SCHEMA_VERSION.to_string()
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// Streaming JSONL progress event for language-neutral live updates.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ProgressEvent {
+    #[serde(rename = "progress.start")]
+    Start {
+        id: String,
+        activity: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        subtask: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        total: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        unit: Option<String>,
+    },
+    #[serde(rename = "progress.update")]
+    Update {
+        id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        current: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        percent: Option<u8>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        rate: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        elapsed_secs: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        subtask: Option<String>,
+    },
+    #[serde(rename = "progress.finish")]
+    Finish {
+        id: String,
+        #[serde(default = "default_ready_status")]
+        status: Status,
+    },
+}
+
+fn default_ready_status() -> Status {
+    Status::Ready
+}
+
+impl RenderHuman for ProtocolEnvelope {
+    fn render_human(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
+        match self {
+            Self::Summary(p) => {
+                let mut screen = SummaryScreen::new(&p.title, p.status);
+                if let Some(ref sub) = p.subtitle {
+                    screen = screen.with_subtitle(sub);
+                }
+                for f in &p.facts {
+                    screen = screen.fact(&f.name, &f.value);
+                }
+                for n in &p.notices {
+                    screen = screen.notice(n.clone());
+                }
+                for a in &p.actions {
+                    screen = screen.action(a.clone());
+                }
+                screen.render_human(ctx, out)
+            }
+            Self::Table(p) => {
+                let headers: Vec<&str> = p.headers.iter().map(|s| s.as_str()).collect();
+                let mut model = TableModel::new(headers);
+                if let Some(ref t) = p.title {
+                    model = model.with_title(t);
+                }
+                if let Some(ref b) = p.badge {
+                    model = model.with_badge(b);
+                }
+                for row in &p.rows {
+                    model.add_row(row.iter().map(|s| s.as_str()));
+                }
+                let view = TableView::new(model);
+                view.render_human(ctx, out)
+            }
+            Self::Error(p) => {
+                let mut err = ErrorModel::new(&p.what);
+                if let Some(ref why) = p.why {
+                    err = err.with_why(why);
+                }
+                for ev in &p.evidence {
+                    err = err.with_evidence(ev.clone());
+                }
+                for a in &p.actions {
+                    err = err.with_action(a.clone());
+                }
+                let view = ErrorView::new(err);
+                view.render_human(ctx, out)
+            }
+            Self::Plan(p) => {
+                let mut plan = Plan::new(&p.title);
+                if let Some(ref desc) = p.description {
+                    plan = plan.with_description(desc);
+                }
+                for change in &p.changes {
+                    plan = plan.add_change(change.clone());
+                }
+                for c in &p.consequences {
+                    plan = plan.consequence(c);
+                }
+                for w in &p.warnings {
+                    plan = plan.warning(w);
+                }
+                if let Some(rev) = p.reversible {
+                    plan = plan.reversible(rev);
+                }
+                for a in &p.actions {
+                    plan = plan.with_action(a.clone());
+                }
+                plan.render_human(ctx, out)
+            }
+            Self::Receipt(p) => {
+                let mut receipt = Receipt::success(&p.title).with_status(p.status);
+                for c in &p.changes {
+                    receipt = receipt.change(&c.name, &c.value);
+                }
+                for u in &p.unchanged {
+                    receipt = receipt.unchanged(&u.name, &u.value);
+                }
+                if let Some(ref g) = p.guidance {
+                    receipt = receipt.guidance(g);
+                }
+                for w in &p.warnings {
+                    receipt = receipt.warning(w.clone());
+                }
+                if let Some(ref h) = p.evidence_handle {
+                    receipt = receipt.with_evidence_handle(h);
+                }
+                for a in &p.actions {
+                    receipt = receipt.with_action(a.clone());
+                }
+                receipt.render_human(ctx, out)
+            }
+            Self::Confirm(p) => {
+                let mut confirm = Confirm::new(&p.prompt).with_default(p.default);
+                if let Some(fb) = p.non_interactive_fallback {
+                    confirm = confirm.with_non_interactive_fallback(fb);
+                }
+                confirm.render_human(ctx, out)
+            }
+            Self::Choice(p) => {
+                let mut choice =
+                    Choice::new(&p.prompt, p.items.clone()).with_default_index(p.default_index);
+                if let Some(fb) = p.non_interactive_fallback {
+                    choice = choice.with_non_interactive_fallback(fb);
+                }
+                choice.render_human(ctx, out)
+            }
+        }
+    }
+}
+
+impl RenderPlain for ProtocolEnvelope {
+    fn render_plain(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
+        match self {
+            Self::Summary(p) => {
+                let mut screen = SummaryScreen::new(&p.title, p.status);
+                if let Some(ref sub) = p.subtitle {
+                    screen = screen.with_subtitle(sub);
+                }
+                for f in &p.facts {
+                    screen = screen.fact(&f.name, &f.value);
+                }
+                for n in &p.notices {
+                    screen = screen.notice(n.clone());
+                }
+                for a in &p.actions {
+                    screen = screen.action(a.clone());
+                }
+                screen.render_plain(ctx, out)
+            }
+            Self::Table(p) => {
+                let headers: Vec<&str> = p.headers.iter().map(|s| s.as_str()).collect();
+                let mut model = TableModel::new(headers);
+                if let Some(ref t) = p.title {
+                    model = model.with_title(t);
+                }
+                if let Some(ref b) = p.badge {
+                    model = model.with_badge(b);
+                }
+                for row in &p.rows {
+                    model.add_row(row.iter().map(|s| s.as_str()));
+                }
+                let view = TableView::new(model);
+                view.render_plain(ctx, out)
+            }
+            Self::Error(p) => {
+                let mut err = ErrorModel::new(&p.what);
+                if let Some(ref why) = p.why {
+                    err = err.with_why(why);
+                }
+                for ev in &p.evidence {
+                    err = err.with_evidence(ev.clone());
+                }
+                for a in &p.actions {
+                    err = err.with_action(a.clone());
+                }
+                let view = ErrorView::new(err);
+                view.render_plain(ctx, out)
+            }
+            Self::Plan(p) => {
+                let mut plan = Plan::new(&p.title);
+                if let Some(ref desc) = p.description {
+                    plan = plan.with_description(desc);
+                }
+                for change in &p.changes {
+                    plan = plan.add_change(change.clone());
+                }
+                for c in &p.consequences {
+                    plan = plan.consequence(c);
+                }
+                for w in &p.warnings {
+                    plan = plan.warning(w);
+                }
+                if let Some(rev) = p.reversible {
+                    plan = plan.reversible(rev);
+                }
+                for a in &p.actions {
+                    plan = plan.with_action(a.clone());
+                }
+                plan.render_plain(ctx, out)
+            }
+            Self::Receipt(p) => {
+                let mut receipt = Receipt::success(&p.title).with_status(p.status);
+                for c in &p.changes {
+                    receipt = receipt.change(&c.name, &c.value);
+                }
+                for u in &p.unchanged {
+                    receipt = receipt.unchanged(&u.name, &u.value);
+                }
+                if let Some(ref g) = p.guidance {
+                    receipt = receipt.guidance(g);
+                }
+                for w in &p.warnings {
+                    receipt = receipt.warning(w.clone());
+                }
+                if let Some(ref h) = p.evidence_handle {
+                    receipt = receipt.with_evidence_handle(h);
+                }
+                for a in &p.actions {
+                    receipt = receipt.with_action(a.clone());
+                }
+                receipt.render_plain(ctx, out)
+            }
+            Self::Confirm(p) => {
+                let mut confirm = Confirm::new(&p.prompt).with_default(p.default);
+                if let Some(fb) = p.non_interactive_fallback {
+                    confirm = confirm.with_non_interactive_fallback(fb);
+                }
+                confirm.render_plain(ctx, out)
+            }
+            Self::Choice(p) => {
+                let mut choice =
+                    Choice::new(&p.prompt, p.items.clone()).with_default_index(p.default_index);
+                if let Some(fb) = p.non_interactive_fallback {
+                    choice = choice.with_non_interactive_fallback(fb);
+                }
+                choice.render_plain(ctx, out)
+            }
+        }
+    }
+}
+
+impl RenderAgent for ProtocolEnvelope {
+    fn to_agent_json(&self, pretty: bool) -> Result<String, serde_json::Error> {
+        if pretty {
+            serde_json::to_string_pretty(self)
+        } else {
+            serde_json::to_string(self)
+        }
+    }
+}

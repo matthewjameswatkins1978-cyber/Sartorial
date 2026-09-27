@@ -68,6 +68,25 @@ impl Choice {
         self
     }
 
+    /// Calculate visual terminal line count, accounting for lines that visually wrap due to terminal width.
+    pub fn calculate_rendered_lines(&self, ctx: &RenderContext) -> u16 {
+        use unicode_width::UnicodeWidthStr;
+        let width = ctx.width.max(1);
+
+        let prompt_width = self.prompt.width();
+        let mut total = prompt_width.max(1).div_ceil(width) as u16;
+
+        for (idx, item) in self.items.iter().enumerate() {
+            let mut line_width = 2 + format!("{}. ", idx + 1).len() + item.label.width();
+            if let Some(ref desc) = item.description {
+                line_width += 2 + desc.width();
+            }
+            total += line_width.max(1).div_ceil(width) as u16;
+        }
+
+        total
+    }
+
     /// Execute selection using default configuration.
     pub fn select(&mut self) -> io::Result<ChoiceOutcome<'_>> {
         self.select_with_config(&Config::default())
@@ -97,7 +116,8 @@ impl Choice {
         self.render_human(&ctx, &mut out)?;
         out.flush()?;
 
-        let total_lines = (1 + self.items.len()) as u16;
+        // Calculate exact visual terminal lines accounting for wrapped rows
+        let total_lines = self.calculate_rendered_lines(&ctx);
 
         loop {
             // Block until event is available: zero output or CPU usage while idle

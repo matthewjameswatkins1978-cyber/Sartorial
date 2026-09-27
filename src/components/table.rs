@@ -45,14 +45,24 @@ impl TableView {
         res
     }
 
-    /// Calculate column widths bounded by terminal width.
-    fn calculate_column_widths(&self, max_terminal_width: usize, col_gap: usize) -> Vec<usize> {
+    /// Calculate column widths bounded by terminal width, returning (widths, effective_col_gap).
+    fn calculate_column_widths(
+        &self,
+        max_terminal_width: usize,
+        col_gap: usize,
+    ) -> (Vec<usize>, usize) {
         let col_count = self.model.headers.len();
-        if col_count == 0 {
-            return Vec::new();
+        if col_count == 0 || max_terminal_width == 0 {
+            return (Vec::new(), 0);
         }
-        let mut widths = vec![0; col_count];
 
+        let actual_gap = if max_terminal_width < 30 {
+            1.min(col_gap)
+        } else {
+            col_gap
+        };
+
+        let mut widths = vec![0; col_count];
         for (i, h) in self.model.headers.iter().enumerate() {
             widths[i] = widths[i].max(h.width());
         }
@@ -65,21 +75,41 @@ impl TableView {
             }
         }
 
-        // Enforce terminal width constraint
-        let total_gaps = col_count.saturating_sub(1) * col_gap;
+        // Target available width for columns
+        let total_gaps = col_count.saturating_sub(1) * actual_gap;
         let available_width = max_terminal_width.saturating_sub(total_gaps);
 
         let mut current_total: usize = widths.iter().sum();
         while current_total > available_width {
             let (max_idx, &max_val) = widths.iter().enumerate().max_by_key(|(_, &w)| w).unwrap();
-            if max_val <= 3 {
+            if max_val <= 1 {
                 break;
             }
             widths[max_idx] -= 1;
             current_total -= 1;
         }
 
-        widths
+        // If terminal width is absurdly tiny (< col_count + total_gaps):
+        // Only keep columns that can fit within max_terminal_width, zeroing out rightmost columns
+        let mut total_with_gaps = widths.iter().filter(|&&w| w > 0).sum::<usize>()
+            + (widths.iter().filter(|&&w| w > 0).count().saturating_sub(1) * actual_gap);
+
+        if total_with_gaps > max_terminal_width {
+            for i in (0..col_count).rev() {
+                if total_with_gaps <= max_terminal_width {
+                    break;
+                }
+                widths[i] = 0;
+                let active = widths.iter().filter(|&&w| w > 0).count();
+                total_with_gaps =
+                    widths.iter().sum::<usize>() + (active.saturating_sub(1) * actual_gap);
+            }
+            if widths.iter().any(|&w| w > 0) && widths[0] > max_terminal_width {
+                widths[0] = max_terminal_width;
+            }
+        }
+
+        (widths, actual_gap)
     }
 
     fn pad_cell(text: &str, width: usize, alignment: ColumnAlignment) -> String {
@@ -110,10 +140,16 @@ impl RenderHuman for TableView {
             sec.render_human(ctx, out)?;
         }
 
-        let col_gap = if ctx.is_narrow() { 2 } else { 4 };
-        let widths = self.calculate_column_widths(ctx.width, col_gap);
+        let base_col_gap = if ctx.is_narrow() { 2 } else { 4 };
+        let (widths, col_gap) = self.calculate_column_widths(ctx.width, base_col_gap);
+        let active_cols: Vec<usize> = (0..widths.len()).filter(|&i| widths[i] > 0).collect();
+
+        if active_cols.is_empty() {
+            return Ok(());
+        }
+
         let total_content_width =
-            widths.iter().sum::<usize>() + (widths.len().saturating_sub(1) * col_gap);
+            widths.iter().sum::<usize>() + (active_cols.len().saturating_sub(1) * col_gap);
         let rule_len = total_content_width.min(ctx.width);
 
         if ctx.config.border == BorderStyle::Subtle {
@@ -124,7 +160,8 @@ impl RenderHuman for TableView {
 
         // Render rows
         for row in &self.model.rows {
-            for (i, cell) in row.cells.iter().enumerate() {
+            for (pos, &i) in active_cols.iter().enumerate() {
+                let cell = row.cells.get(i).map(|s| s.as_str()).unwrap_or("");
                 let align = self
                     .model
                     .alignments
@@ -133,14 +170,14 @@ impl RenderHuman for TableView {
                     .unwrap_or(ColumnAlignment::Left);
                 let col_width = widths.get(i).copied().unwrap_or(cell.width());
                 let cell_truncated = Self::truncate_with_ellipsis(cell, col_width, is_ascii);
-                let is_last = i == row.cells.len() - 1;
+                let is_last = pos == active_cols.len() - 1;
                 let formatted = if is_last && align == ColumnAlignment::Left {
                     cell_truncated
                 } else {
                     Self::pad_cell(&cell_truncated, col_width, align)
                 };
 
-                // Last column has semantic status styling if recognized
+                // Last active column has semantic status styling if recognized
                 if is_last
                     && (cell == "ready"
                         || cell == "missing"
@@ -148,7 +185,7 @@ impl RenderHuman for TableView {
                         || cell == "attention")
                 {
                     let style =
-                        match cell.as_str() {
+                        match cell {
                             "ready" => anstyle::Style::new()
                                 .fg_color(Some(anstyle::AnsiColor::Green.into())),
                             "missing" | "failed" => {
@@ -168,7 +205,7 @@ impl RenderHuman for TableView {
                     )?;
                 }
 
-                if i < row.cells.len() - 1 {
+                if !is_last {
                     write!(out, "{}", " ".repeat(col_gap))?;
                 }
             }
@@ -189,10 +226,16 @@ impl RenderPlain for TableView {
             sec.render_plain(ctx, out)?;
         }
 
-        let col_gap = if ctx.is_narrow() { 2 } else { 4 };
-        let widths = self.calculate_column_widths(ctx.width, col_gap);
+        let base_col_gap = if ctx.is_narrow() { 2 } else { 4 };
+        let (widths, col_gap) = self.calculate_column_widths(ctx.width, base_col_gap);
+        let active_cols: Vec<usize> = (0..widths.len()).filter(|&i| widths[i] > 0).collect();
+
+        if active_cols.is_empty() {
+            return Ok(());
+        }
+
         let total_content_width =
-            widths.iter().sum::<usize>() + (widths.len().saturating_sub(1) * col_gap);
+            widths.iter().sum::<usize>() + (active_cols.len().saturating_sub(1) * col_gap);
         let rule_len = total_content_width.min(ctx.width);
 
         PlainRenderer::write_rule(out, ctx, rule_len)?;
@@ -200,7 +243,8 @@ impl RenderPlain for TableView {
         let is_ascii = ctx.symbols == SymbolMode::Ascii;
 
         for row in &self.model.rows {
-            for (i, cell) in row.cells.iter().enumerate() {
+            for (pos, &i) in active_cols.iter().enumerate() {
+                let cell = row.cells.get(i).map(|s| s.as_str()).unwrap_or("");
                 let align = self
                     .model
                     .alignments
@@ -209,7 +253,7 @@ impl RenderPlain for TableView {
                     .unwrap_or(ColumnAlignment::Left);
                 let col_width = widths.get(i).copied().unwrap_or(cell.width());
                 let cell_truncated = Self::truncate_with_ellipsis(cell, col_width, is_ascii);
-                let is_last = i == row.cells.len() - 1;
+                let is_last = pos == active_cols.len() - 1;
                 let formatted = if is_last && align == ColumnAlignment::Left {
                     cell_truncated
                 } else {
@@ -217,7 +261,7 @@ impl RenderPlain for TableView {
                 };
 
                 write!(out, "{formatted}")?;
-                if i < row.cells.len() - 1 {
+                if !is_last {
                     write!(out, "{}", " ".repeat(col_gap))?;
                 }
             }

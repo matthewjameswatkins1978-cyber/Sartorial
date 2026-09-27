@@ -73,6 +73,12 @@ impl Action {
         self
     }
 
+    /// Override the display label.
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = label.into();
+        self
+    }
+
     /// Mark as default action.
     pub fn default_action(mut self) -> Self {
         self.is_default = true;

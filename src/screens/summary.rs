@@ -5,6 +5,7 @@ use crate::components::section::Section;
 use crate::components::table::TableView;
 use crate::components::title::Title;
 use crate::render::context::RenderContext;
+use crate::render::human::HumanRenderer;
 use crate::render::{RenderHuman, RenderPlain};
 use crate::semantic::action::Action;
 use crate::semantic::fact::Fact;
@@ -85,6 +86,10 @@ impl RenderHuman for SummaryScreen {
         // Title
         let title_comp = Title::new(&self.title);
         title_comp.render_human(ctx, out)?;
+        if let Some(ref sub) = self.subtitle {
+            HumanRenderer::write_styled(out, HumanRenderer::muted_style(), sub, ctx.color_enabled)?;
+            writeln!(out)?;
+        }
         writeln!(out)?;
 
         // Top Status Section
@@ -129,6 +134,9 @@ impl RenderPlain for SummaryScreen {
     fn render_plain(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
         let title_comp = Title::new(&self.title);
         title_comp.render_plain(ctx, out)?;
+        if let Some(ref sub) = self.subtitle {
+            writeln!(out, "{sub}")?;
+        }
         writeln!(out)?;
 
         let section = Section::new("Status").with_status(self.status);

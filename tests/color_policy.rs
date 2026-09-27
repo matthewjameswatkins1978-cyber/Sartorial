@@ -25,7 +25,7 @@ fn test_ansi_absence_with_never_color() {
 
     let ctx = RenderContext::detect().with_config(Config::new().with_color(ColorChoice::Never));
 
-    let rendered = outcome.to_human_string(&ctx);
+    let rendered = outcome.to_human_string(&ctx).unwrap();
     assert!(!rendered.contains("\x1b["));
     assert!(rendered.contains("TEST"));
     assert!(rendered.contains("Key"));
@@ -38,7 +38,7 @@ fn test_ansi_presence_with_always_color() {
 
     let ctx = RenderContext::detect().with_config(Config::new().with_color(ColorChoice::Always));
 
-    let rendered = outcome.to_human_string(&ctx);
+    let rendered = outcome.to_human_string(&ctx).unwrap();
     // Should contain ANSI escape codes
     assert!(rendered.contains("\x1b["));
 }

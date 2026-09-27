@@ -11,7 +11,7 @@ fn test_error_with_known_cause() {
     assert!(err.is_cause_known());
 
     let ctx = RenderContext::plain();
-    let rendered = err.to_plain_string(&ctx);
+    let rendered = err.to_plain_string(&ctx).unwrap();
 
     assert!(rendered.contains("THREADMOTH NOT VISIBLE"));
     assert!(rendered.contains("Threadmoth is installed, but this process cannot resolve it."));
@@ -30,7 +30,7 @@ fn test_error_with_unknown_cause_preserves_uncertainty() {
     assert!(!err.is_cause_known());
 
     let ctx = RenderContext::plain();
-    let rendered = err.to_plain_string(&ctx);
+    let rendered = err.to_plain_string(&ctx).unwrap();
 
     assert!(rendered.contains("DATABASE CONNECTION REFUSED"));
     // Must preserve uncertainty and NOT manufacture a reason
