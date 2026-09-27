@@ -76,6 +76,7 @@ def main():
     # 1. Render Dry-Run Plan
     plan_payload = {
         "type": "plan",
+        "schema_version": "sartorial.v0.1",
         "title": "Migrate Cluster to Multi-Region",
         "description": "Orchestrated across us-east and eu-west regions",
         "changes": [
@@ -120,6 +121,7 @@ def main():
     # 3. Render Post-Operation Receipt
     receipt_payload = {
         "type": "receipt",
+        "schema_version": "sartorial.v0.1",
         "title": "Cluster Migration Complete",
         "status": "ready",
         "changes": [

@@ -21,13 +21,13 @@ impl MotionMode {
         is_plain: bool,
         reduced_motion: bool,
     ) -> bool {
-        if is_agent || is_plain || reduced_motion {
+        if !is_tty || is_agent || is_plain || reduced_motion {
             return false;
         }
         match self {
             Self::Always => true,
             Self::Never => false,
-            Self::Auto => is_tty,
+            Self::Auto => true,
         }
     }
 }

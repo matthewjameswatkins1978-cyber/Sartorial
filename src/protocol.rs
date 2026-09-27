@@ -33,7 +33,6 @@ pub enum ProtocolEnvelope {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SummaryPayload {
-    #[serde(default = "default_schema_version")]
     pub schema_version: String,
     pub title: String,
     pub status: Status,
@@ -49,7 +48,6 @@ pub struct SummaryPayload {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TablePayload {
-    #[serde(default = "default_schema_version")]
     pub schema_version: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -61,7 +59,6 @@ pub struct TablePayload {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ErrorPayload {
-    #[serde(default = "default_schema_version")]
     pub schema_version: String,
     pub what: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -74,7 +71,6 @@ pub struct ErrorPayload {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlanPayload {
-    #[serde(default = "default_schema_version")]
     pub schema_version: String,
     pub title: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -93,7 +89,6 @@ pub struct PlanPayload {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReceiptPayload {
-    #[serde(default = "default_schema_version")]
     pub schema_version: String,
     pub title: String,
     pub status: Status,
@@ -113,7 +108,6 @@ pub struct ReceiptPayload {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConfirmPayload {
-    #[serde(default = "default_schema_version")]
     pub schema_version: String,
     pub prompt: String,
     #[serde(default = "default_true")]
@@ -124,7 +118,6 @@ pub struct ConfirmPayload {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChoicePayload {
-    #[serde(default = "default_schema_version")]
     pub schema_version: String,
     pub prompt: String,
     pub items: Vec<ChoiceItem>,

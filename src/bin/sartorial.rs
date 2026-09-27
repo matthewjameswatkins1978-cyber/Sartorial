@@ -204,27 +204,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     } => {
                         if let Some(pb) = active_bars.get_mut(&id) {
                             if let Some(cur) = current {
-                                let tot = pb.state().total.unwrap_or(cur);
-                                let unit = pb
-                                    .state()
-                                    .unit
-                                    .clone()
-                                    .unwrap_or_else(|| "units".to_string());
-                                pb.state_mut().current = Some(cur);
-                                pb.state_mut().total = Some(tot);
-                                pb.state_mut().unit = Some(unit);
+                                pb.update_current(cur);
                             }
                             if let Some(pct) = percent {
-                                pb.state_mut().percent = Some(pct);
-                            }
-                            if let Some(secs) = elapsed_secs {
-                                pb.state_mut().elapsed_secs = Some(secs);
+                                pb.update_percent(pct);
                             }
                             if let Some(r) = rate {
-                                pb.state_mut().rate = Some(r);
+                                pb.update_rate(r);
+                            }
+                            if let Some(secs) = elapsed_secs {
+                                pb.update_elapsed(secs);
                             }
                             if let Some(sub) = subtask {
-                                pb.state_mut().subtask = Some(sub);
+                                pb.update_subtask(sub);
                             }
                             pb.update_live(&ctx)?;
                         }

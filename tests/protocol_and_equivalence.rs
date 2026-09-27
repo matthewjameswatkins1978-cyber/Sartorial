@@ -195,6 +195,7 @@ fn test_receipt_native_and_protocol_equivalence() {
 fn test_json_foreign_client_deserialization() {
     let json_input = r#"{
         "type": "summary",
+        "schema_version": "sartorial.v0.1",
         "title": "Foreign Client Job",
         "status": "ready",
         "subtitle": "Executed via Python client",
@@ -273,6 +274,7 @@ fn test_jsonl_progress_stream_deserialization() {
 fn test_confirm_and_choice_protocol_payloads() {
     let confirm_json = r#"{
         "type": "confirm",
+        "schema_version": "sartorial.v0.1",
         "prompt": "Apply changes?",
         "default": true,
         "non_interactive_fallback": false
@@ -295,6 +297,7 @@ fn test_confirm_and_choice_protocol_payloads() {
 
     let choice_json = r#"{
         "type": "choice",
+        "schema_version": "sartorial.v0.1",
         "prompt": "Select target environment:",
         "items": [
             {"id": "dev", "label": "Development", "description": "Local sandbox"},
@@ -319,5 +322,51 @@ fn test_confirm_and_choice_protocol_payloads() {
             assert_eq!(non_interactive_fallback, Some(0));
         }
         _ => panic!("Expected choice envelope"),
+    }
+}
+
+#[test]
+fn test_render_schema_version_validation() {
+    // 1. Missing schema_version -> Rejected
+    let missing_json = r#"{
+        "type": "summary",
+        "title": "Missing Schema",
+        "status": "ready"
+    }"#;
+    let res_missing = ProtocolEnvelope::from_json_str(missing_json);
+    assert!(
+        res_missing.is_err(),
+        "Missing schema_version must be rejected on render envelopes"
+    );
+
+    // 2. Correct schema_version -> Accepted
+    let correct_json = r#"{
+        "type": "summary",
+        "schema_version": "sartorial.v0.1",
+        "title": "Valid Schema",
+        "status": "ready"
+    }"#;
+    let res_correct = ProtocolEnvelope::from_json_str(correct_json);
+    assert!(res_correct.is_ok(), "sartorial.v0.1 must be accepted");
+
+    // 3. Unknown schema_version -> Rejected
+    let unknown_json = r#"{
+        "type": "summary",
+        "schema_version": "sartorial.v9.9",
+        "title": "Future Schema",
+        "status": "ready"
+    }"#;
+    let res_unknown = ProtocolEnvelope::from_json_str(unknown_json);
+    assert!(
+        res_unknown.is_err(),
+        "Unsupported schema_version must be rejected"
+    );
+    if let Err(sartorial::protocol::ProtocolError::UnsupportedVersion { expected, actual }) =
+        res_unknown
+    {
+        assert_eq!(expected, "sartorial.v0.1");
+        assert_eq!(actual, "sartorial.v9.9");
+    } else {
+        panic!("Expected UnsupportedVersion error");
     }
 }

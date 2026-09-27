@@ -25,6 +25,7 @@ Write-Host "--- Using Sartorial Driver: $binary ---`n"
 # 1. Render Dry-Run Plan
 $plan = @{
     type = "plan"
+    schema_version = "sartorial.v0.1"
     title = "Deploy Service Mesh"
     description = "Rolling update for envoy sidecars"
     changes = @(
@@ -59,6 +60,7 @@ Write-Host "`n--- Post-Operation Receipt ---`n"
 # 3. Render Post-Operation Receipt
 $receipt = @{
     type = "receipt"
+    schema_version = "sartorial.v0.1"
     title = "Service Mesh Rollout"
     status = "ready"
     changes = @(

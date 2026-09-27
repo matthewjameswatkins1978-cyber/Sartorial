@@ -422,3 +422,152 @@ fn test_10_preset_visual_differences_beyond_accent_colour() {
         "Workwear must format key delimiters as [ ], got:\n{stdout_ww}"
     );
 }
+
+#[test]
+fn test_11_workwear_stream_progress_state_coherence() {
+    let stream_data = "\
+{\"type\":\"progress.start\",\"id\":\"scan\",\"activity\":\"Scanning repository\",\"total\":100}\n\
+{\"type\":\"progress.update\",\"id\":\"scan\",\"current\":50}\n\
+{\"type\":\"progress.update\",\"id\":\"scan\",\"current\":100}\n\
+{\"type\":\"progress.finish\",\"id\":\"scan\",\"status\":\"ready\"}\n";
+
+    let mut child = sartorial_bin()
+        .arg("stream")
+        .arg("--preset")
+        .arg("workwear")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(stream_data.as_bytes())
+        .unwrap();
+
+    let output = child.wait_with_output().unwrap();
+    assert_eq!(output.status.code(), Some(ExitCode::Success.as_i32()));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // In Workwear, [100/100] must be accompanied by 100%, and NEVER 0%
+    assert!(
+        stderr.contains("[100/100] 100%"),
+        "Workwear must produce [100/100] 100% on completion, got:\n{stderr}"
+    );
+    assert!(
+        !stderr.contains("[100/100] 0%"),
+        "Workwear must NEVER produce [100/100] 0%!"
+    );
+}
+
+#[test]
+fn test_12_percent_only_streaming() {
+    let stream_data = "\
+{\"type\":\"progress.start\",\"id\":\"comp\",\"activity\":\"Compiling crate\"}\n\
+{\"type\":\"progress.update\",\"id\":\"comp\",\"percent\":42}\n\
+{\"type\":\"progress.update\",\"id\":\"comp\",\"percent\":100}\n\
+{\"type\":\"progress.finish\",\"id\":\"comp\",\"status\":\"ready\"}\n";
+
+    let mut child = sartorial_bin()
+        .arg("stream")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(stream_data.as_bytes())
+        .unwrap();
+
+    let output = child.wait_with_output().unwrap();
+    assert_eq!(output.status.code(), Some(ExitCode::Success.as_i32()));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("100%"),
+        "Percent-only stream must render final percentage, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn test_13_motion_always_on_non_tty_stays_static_no_frame_spam() {
+    let stream_data = "\
+{\"type\":\"progress.start\",\"id\":\"task3\",\"activity\":\"Processing data\",\"total\":100}\n\
+{\"type\":\"progress.update\",\"id\":\"task3\",\"current\":20}\n\
+{\"type\":\"progress.update\",\"id\":\"task3\",\"current\":40}\n\
+{\"type\":\"progress.update\",\"id\":\"task3\",\"current\":60}\n\
+{\"type\":\"progress.update\",\"id\":\"task3\",\"current\":80}\n\
+{\"type\":\"progress.update\",\"id\":\"task3\",\"current\":100}\n\
+{\"type\":\"progress.finish\",\"id\":\"task3\",\"status\":\"ready\"}\n";
+
+    let mut child = sartorial_bin()
+        .arg("stream")
+        .arg("--motion")
+        .arg("always")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(stream_data.as_bytes())
+        .unwrap();
+
+    let output = child.wait_with_output().unwrap();
+    assert_eq!(output.status.code(), Some(ExitCode::Success.as_i32()));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let lines: Vec<&str> = stderr.lines().filter(|l| !l.trim().is_empty()).collect();
+
+    // Bounded static output on non-TTY even with --motion always: exactly 2 lines
+    assert_eq!(
+        lines.len(),
+        2,
+        "--motion always on non-TTY must not emit frame spam, got {} lines:\n{:?}",
+        lines.len(),
+        lines
+    );
+    assert!(lines[0].contains("Starting: Processing data"));
+    assert!(lines[1].contains("Processing data"));
+}
+
+#[test]
+fn test_14_missing_schema_version_rejected_with_exit_2() {
+    let payload = r#"{
+        "type": "summary",
+        "title": "Missing Schema Version",
+        "status": "ready"
+    }"#;
+
+    let mut child = sartorial_bin()
+        .arg("render")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(payload.as_bytes())
+        .unwrap();
+
+    let output = child.wait_with_output().unwrap();
+    assert_eq!(output.status.code(), Some(ExitCode::UsageError.as_i32()));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("schema_version"),
+        "Error message must mention missing schema_version, got: {stderr}"
+    );
+}

@@ -137,6 +137,57 @@ impl ProgressState {
         self.status = status;
         self
     }
+
+    /// Update current progress count and recompute percentage if total is known.
+    pub fn update_current(&mut self, cur: u64) {
+        self.current = Some(cur);
+        if let Some(tot) = self.total {
+            self.percent = (cur.saturating_mul(100))
+                .checked_div(tot)
+                .map(|p| p.min(100) as u8)
+                .or(Some(100));
+        }
+        if self.mode == ProgressMode::Activity {
+            self.mode = ProgressMode::Count;
+        }
+    }
+
+    /// Update total count and recompute percentage if current is known.
+    pub fn update_total(&mut self, tot: u64) {
+        self.total = Some(tot);
+        if let Some(cur) = self.current {
+            self.percent = (cur.saturating_mul(100))
+                .checked_div(tot)
+                .map(|p| p.min(100) as u8)
+                .or(Some(100));
+        }
+    }
+
+    /// Update explicit percentage and set mode to Percent if appropriate.
+    pub fn update_percent(&mut self, pct: u8) {
+        self.percent = Some(pct.min(100));
+        if self.current.is_none() && self.total.is_none() {
+            self.mode = ProgressMode::Percent;
+        }
+    }
+
+    /// Update rate and set mode to Rate if units/progress exist.
+    pub fn update_rate(&mut self, rate: impl Into<String>) {
+        self.rate = Some(rate.into());
+        if self.mode == ProgressMode::Count || self.mode == ProgressMode::Activity {
+            self.mode = ProgressMode::Rate;
+        }
+    }
+
+    /// Update subtask.
+    pub fn update_subtask(&mut self, subtask: impl Into<String>) {
+        self.subtask = Some(subtask.into());
+    }
+
+    /// Update elapsed seconds.
+    pub fn update_elapsed(&mut self, secs: u64) {
+        self.elapsed_secs = Some(secs);
+    }
 }
 
 #[derive(Serialize)]

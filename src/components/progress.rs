@@ -98,6 +98,30 @@ impl ProgressBar {
         &mut self.state
     }
 
+    pub fn update_current(&mut self, cur: u64) {
+        self.state.update_current(cur);
+    }
+
+    pub fn update_total(&mut self, tot: u64) {
+        self.state.update_total(tot);
+    }
+
+    pub fn update_percent(&mut self, pct: u8) {
+        self.state.update_percent(pct);
+    }
+
+    pub fn update_rate(&mut self, rate: impl Into<String>) {
+        self.state.update_rate(rate);
+    }
+
+    pub fn update_subtask(&mut self, subtask: impl Into<String>) {
+        self.state.update_subtask(subtask);
+    }
+
+    pub fn update_elapsed(&mut self, secs: u64) {
+        self.state.update_elapsed(secs);
+    }
+
     pub fn finish_with_status(&mut self, status: Status) {
         self.state.status = status;
         if let Some(pb) = self.indicatif_bar.take() {
@@ -105,18 +129,8 @@ impl ProgressBar {
         }
     }
 
-    /// Single authority for beginning live progress presentation.
-    ///
-    /// Respects:
-    /// - `Config::motion`
-    /// - `AccessibilityMode` (reduced motion)
-    /// - `RenderTarget` (plain text and agent JSON)
-    /// - TTY capability (non-interactive stdout/stderr)
-    /// - `ResolvedStyle` / preset progress treatment
-    pub fn start_live(&mut self, ctx: &RenderContext) -> io::Result<()> {
-        use std::io::IsTerminal;
-        let is_tty = std::io::stderr().is_terminal();
-
+    /// Single authority for beginning live progress presentation with explicit TTY capability.
+    pub fn start_live_with_tty(&mut self, ctx: &RenderContext, is_tty: bool) -> io::Result<()> {
         if ctx.should_animate(is_tty) {
             let pb = indicatif::ProgressBar::new_spinner();
             pb.enable_steady_tick(Duration::from_millis(100)); // 10 Hz rate limit
@@ -168,6 +182,26 @@ impl ProgressBar {
         Ok(())
     }
 
+    /// Single authority for beginning live progress presentation.
+    ///
+    /// Respects:
+    /// - `Config::motion`
+    /// - `AccessibilityMode` (reduced motion)
+    /// - `RenderTarget` (plain text and agent JSON)
+    /// - TTY capability (non-interactive stdout/stderr)
+    /// - `ResolvedStyle` / preset progress treatment
+    pub fn start_live(&mut self, ctx: &RenderContext) -> io::Result<()> {
+        use std::io::IsTerminal;
+        let is_tty = std::io::stderr().is_terminal();
+        self.start_live_with_tty(ctx, is_tty)
+    }
+
+    /// Backwards compatibility helper delegating to start_live_with_tty without ignoring supplied is_tty.
+    pub fn start_interactive(&mut self, is_tty: bool) {
+        let ctx = RenderContext::detect();
+        let _ = self.start_live_with_tty(&ctx, is_tty);
+    }
+
     /// Visibly update live progress.
     pub fn update_live(&mut self, _ctx: &RenderContext) -> io::Result<()> {
         if let Some(ref pb) = self.indicatif_bar {
@@ -210,12 +244,6 @@ impl ProgressBar {
             self.render_human(ctx, &mut err)?;
         }
         Ok(())
-    }
-
-    /// Backwards compatibility helper delegating to start_live.
-    pub fn start_interactive(&mut self, _is_tty: bool) {
-        let ctx = RenderContext::detect();
-        let _ = self.start_live(&ctx);
     }
 
     /// Formats a clean progress bar of the specified width.
@@ -263,7 +291,13 @@ impl RenderHuman for ProgressBar {
         if treatment == ProgressTreatment::Numeric {
             let count_str = match (self.state.current, self.state.total) {
                 (Some(c), Some(t)) => format!("[{c}/{t}]"),
-                _ => "[--/--]".to_string(),
+                _ => {
+                    if let Some(pct) = self.state.percent {
+                        format!("[{pct}%]")
+                    } else {
+                        "[--/--]".to_string()
+                    }
+                }
             };
             HumanRenderer::write_styled(
                 out,
@@ -272,8 +306,10 @@ impl RenderHuman for ProgressBar {
                 ctx.color_enabled,
             )?;
 
-            if let Some(pct) = self.state.percent {
-                write!(out, " {pct}%")?;
+            if self.state.current.is_some() && self.state.total.is_some() {
+                if let Some(pct) = self.state.percent {
+                    write!(out, " {pct}%")?;
+                }
             }
 
             if let Some(secs) = self.state.elapsed_secs {

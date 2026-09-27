@@ -112,3 +112,15 @@ fn test_convenience_helpers_return_io_results() {
     let json_res = to_agent_json(&outcome);
     assert!(json_res.is_ok());
 }
+
+#[test]
+fn test_interactive_off_prevents_live_animation() {
+    let cfg = Config::new()
+        .with_interactive(InteractiveMode::Off)
+        .with_motion(MotionMode::Always);
+    let ctx = RenderContext::detect().with_config(cfg);
+
+    // InteractiveMode::Off must prevent live animation even if is_tty is true and motion is Always
+    assert!(!ctx.should_animate(true));
+    assert!(!ctx.should_animate(false));
+}
