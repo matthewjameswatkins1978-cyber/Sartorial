@@ -1,6 +1,6 @@
 # Biscuit Logic CLI Presentation Standard (BL-CLI-01)
 **Standard Authority**: Biscuit Logic Architecture & Engineering<br>
-**Version**: 0.1.0<br>
+**Version**: 0.2.0<br>
 **Implementation Toolkit**: Sartorial (`sartorial`)
 
 ---

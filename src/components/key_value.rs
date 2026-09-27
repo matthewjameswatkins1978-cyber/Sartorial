@@ -37,20 +37,28 @@ impl RenderHuman for KeyValueList {
             return Ok(());
         }
 
-        let max_label_len = self.facts.iter().map(|f| f.name.width()).max().unwrap_or(0);
-        let pad_spacing = ctx.style.key_value_padding();
+        let labels: Vec<String> = self
+            .facts
+            .iter()
+            .map(|f| ctx.style.format_fact_label(&f.name))
+            .collect();
+        let max_label_len = labels.iter().map(|l| l.width()).max().unwrap_or(0);
+        let pad_spacing = ctx.style.fact_pad(ctx.is_narrow());
         let pad_label = (max_label_len + pad_spacing).min(30);
 
-        for fact in &self.facts {
+        for (fact, label) in self.facts.iter().zip(labels.iter()) {
             if ctx.is_narrow() {
                 // Stacked format for narrow terminals (< 60 cols)
                 HumanRenderer::write_styled(
                     out,
                     ctx.style.label_style(),
-                    &fact.name,
+                    label,
                     ctx.color_enabled,
                 )?;
-                writeln!(out, ":")?;
+                if !label.ends_with(':') {
+                    write!(out, ":")?;
+                }
+                writeln!(out)?;
                 write!(out, "  ")?;
                 let val_style = if fact.muted {
                     ctx.style.muted_style()
@@ -70,11 +78,11 @@ impl RenderHuman for KeyValueList {
                 writeln!(out)?;
             } else {
                 // Aligned columns for standard/wide terminals
-                let label_width = fact.name.width();
+                let label_width = label.width();
                 HumanRenderer::write_styled(
                     out,
                     ctx.style.label_style(),
-                    &fact.name,
+                    label,
                     ctx.color_enabled,
                 )?;
                 let pad = if pad_label > label_width {
@@ -108,15 +116,24 @@ impl RenderHuman for KeyValueList {
 
 impl RenderPlain for KeyValueList {
     fn render_plain(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
-        let max_label_len = self.facts.iter().map(|f| f.name.width()).max().unwrap_or(0);
-        let pad_spacing = ctx.style.key_value_padding();
+        let labels: Vec<String> = self
+            .facts
+            .iter()
+            .map(|f| ctx.style.format_fact_label(&f.name))
+            .collect();
+        let max_label_len = labels.iter().map(|l| l.width()).max().unwrap_or(0);
+        let pad_spacing = ctx.style.fact_pad(ctx.is_narrow());
         let pad_label = (max_label_len + pad_spacing).min(30);
 
-        for fact in &self.facts {
+        for (fact, label) in self.facts.iter().zip(labels.iter()) {
             if ctx.is_narrow() {
-                writeln!(out, "{}:\n  {}", fact.name, fact.value)?;
+                if label.ends_with(':') {
+                    writeln!(out, "{label}\n  {}", fact.value)?;
+                } else {
+                    writeln!(out, "{label}:\n  {}", fact.value)?;
+                }
             } else {
-                let label_width = fact.name.width();
+                let label_width = label.width();
                 let pad = if pad_label > label_width {
                     pad_label - label_width
                 } else {
@@ -129,8 +146,7 @@ impl RenderPlain for KeyValueList {
                     .unwrap_or_default();
                 writeln!(
                     out,
-                    "{}{}{}{}",
-                    fact.name,
+                    "{label}{}{}{}",
                     " ".repeat(pad),
                     fact.value,
                     unit_suffix

@@ -64,7 +64,7 @@ pub use semantic::{
     Action, ChangeKind, ChoiceItem, ErrorModel, Evidence, Fact, Notice, NoticeLevel, Outcome, Plan,
     PlanChange, ProgressError, ProgressState, Receipt, Status, TableModel, TableRow,
 };
-pub use style::{Preset, ProgressTreatment, ResolvedStyle};
+pub use style::{Preset, ProgressTreatment, ResolvedStyle, SectionRule, StatusLayout, TitleCase};
 pub use typo::TypoSuggestion;
 pub use verbosity::Verbosity;
 

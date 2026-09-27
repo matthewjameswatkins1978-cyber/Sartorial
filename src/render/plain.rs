@@ -20,4 +20,12 @@ impl PlainRenderer {
         let line = "-".repeat(len.min(ctx.width));
         writeln!(out, "{line}")
     }
+
+    /// Blank lines between major components per the preset grammar.
+    pub fn write_component_gap(out: &mut dyn Write, ctx: &RenderContext) -> io::Result<()> {
+        for _ in 0..ctx.style.component_gap(ctx.is_narrow()) {
+            writeln!(out)?;
+        }
+        Ok(())
+    }
 }

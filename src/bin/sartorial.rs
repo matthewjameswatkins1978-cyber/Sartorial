@@ -12,7 +12,7 @@ use std::io::{self, BufRead, IsTerminal, Read};
 #[derive(Parser, Debug)]
 #[command(
     name = "sartorial",
-    version = "0.1.0",
+    version = "0.2.0",
     about = "Language-Neutral Terminal Presentation Driver (BL-CLI-01)"
 )]
 struct Cli {

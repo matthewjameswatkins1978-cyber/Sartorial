@@ -33,6 +33,12 @@ impl Default for RenderContext {
 
 impl RenderContext {
     /// Automatically detect terminal capabilities and current terminal dimensions.
+    ///
+    /// Detection reads the **stdout** TTY: color, symbols, and width describe
+    /// where results land. Live progress is different — spinners draw on
+    /// **stderr**, so [`crate::components::ProgressBar::start_live`] sniffs
+    /// the stderr TTY instead. The split lets piped results stay clean while
+    /// an attended terminal still animates, and vice versa.
     pub fn detect() -> Self {
         let is_tty = std::io::stdout().is_terminal();
         let config = Config::default();
@@ -57,13 +63,31 @@ impl RenderContext {
 
     /// Context explicitly configured for pipe-safe plain output.
     pub fn plain() -> Self {
-        let mut ctx = Self::detect();
-        ctx.target = RenderTarget::Plain;
-        ctx.color_enabled = false;
-        ctx.symbols = SymbolMode::Ascii;
-        ctx.style.color_enabled = false;
-        ctx.style.symbols = SymbolMode::Ascii;
-        ctx
+        Self::plain_preset(crate::style::Preset::House)
+    }
+
+    /// Pipe-safe plain context for an explicit preset: the layout grammar
+    /// (casing, markers, density) is preserved, ANSI and animation are off.
+    pub fn plain_preset(preset: crate::style::Preset) -> Self {
+        let config = Config::default().with_preset(preset);
+        Self::detect()
+            .with_config(config)
+            .with_target(RenderTarget::Plain)
+    }
+
+    /// Human terminal context for a preset with the default motion policy.
+    /// This is the normal entry point: no `Config` knowledge required.
+    pub fn human(preset: crate::style::Preset) -> Self {
+        Self::human_motion(preset, crate::motion::MotionMode::Auto)
+    }
+
+    /// Human terminal context for a preset with an explicit motion policy
+    /// (use `MotionMode::Never` for animation-free output and tests).
+    pub fn human_motion(preset: crate::style::Preset, motion: crate::motion::MotionMode) -> Self {
+        let config = Config::default().with_preset(preset).with_motion(motion);
+        Self::detect()
+            .with_config(config)
+            .with_target(RenderTarget::Human)
     }
 
     /// Context explicitly configured for structured agent output.

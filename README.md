@@ -94,7 +94,7 @@ Add Sartorial to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-sartorial = "0.1"
+sartorial = "0.2"
 ```
 
 ### 1. Summary Screen

@@ -24,6 +24,25 @@ impl RenderHuman for NoticeView {
             _ => self.notice.level.unicode_glyph(),
         };
 
+        if ctx.style.notice_compact {
+            // Operator voice: compact one-line treatment, detail inline.
+            HumanRenderer::write_styled(out, self.notice.level.style(), glyph, ctx.color_enabled)?;
+            write!(out, " {}", self.notice.message)?;
+            if let Some(ref detail) = self.notice.detail {
+                let sep = match ctx.symbols {
+                    SymbolMode::Ascii => " - ",
+                    _ => " · ",
+                };
+                HumanRenderer::write_styled(
+                    out,
+                    ctx.style.muted_style(),
+                    &format!("{sep}{detail}"),
+                    ctx.color_enabled,
+                )?;
+            }
+            return writeln!(out);
+        }
+
         if self.notice.level == NoticeLevel::Info {
             // Quiet info is just plain text or muted
             HumanRenderer::write_styled(

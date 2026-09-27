@@ -20,13 +20,16 @@ impl ErrorView {
 
 impl RenderHuman for ErrorView {
     fn render_human(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
-        // 1. WHAT HAPPENED? (Strong, uppercase title, restrained)
-        let what_upper = self.error.what.to_uppercase();
+        // 1. WHAT HAPPENED? (Strong title; casing follows the preset grammar.)
+        let what = match ctx.style.title_case {
+            crate::style::TitleCase::Upper => self.error.what.to_uppercase(),
+            crate::style::TitleCase::Preserve => self.error.what.clone(),
+        };
         let err_style = anstyle::Style::new()
             .fg_color(Some(anstyle::AnsiColor::Red.into()))
             .effects(anstyle::Effects::BOLD);
 
-        HumanRenderer::write_styled(out, err_style, &what_upper, ctx.color_enabled)?;
+        HumanRenderer::write_styled(out, err_style, &what, ctx.color_enabled)?;
         writeln!(out)?;
         writeln!(out)?;
 
@@ -89,8 +92,11 @@ impl RenderHuman for ErrorView {
 
 impl RenderPlain for ErrorView {
     fn render_plain(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
-        let what_upper = self.error.what.to_uppercase();
-        writeln!(out, "{what_upper}\n")?;
+        let what = match ctx.style.title_case {
+            crate::style::TitleCase::Upper => self.error.what.to_uppercase(),
+            crate::style::TitleCase::Preserve => self.error.what.clone(),
+        };
+        writeln!(out, "{what}\n")?;
 
         if let Some(ref why) = self.error.why {
             writeln!(out, "{why}")?;

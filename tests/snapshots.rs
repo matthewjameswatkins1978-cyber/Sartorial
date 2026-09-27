@@ -24,9 +24,9 @@ fn test_summary_screen_snapshot_plain() {
     let expected = "\
 SARTORIAL
 
-Status                                            [OK] READY
+Status        [OK] READY
 
-Tools                                                 9 / 11
+Tools        9 / 11
 --------------------------------
 Git           2.51.0     ready
 ripgrep       14.1.1     ready

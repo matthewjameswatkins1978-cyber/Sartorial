@@ -13,6 +13,10 @@ pub enum KeyTrigger {
     Left,
     Right,
     Custom(String),
+    /// Display-only hint: no key exists. Renders as plain guidance text with
+    /// no key brackets. Use [`Action::hint`] for next-step suggestions in
+    /// non-interactive output; never attach a dead key.
+    None,
 }
 
 impl KeyTrigger {
@@ -27,6 +31,7 @@ impl KeyTrigger {
             Self::Left => "←".to_string(),
             Self::Right => "→".to_string(),
             Self::Custom(s) => s.clone(),
+            Self::None => String::new(),
         }
     }
 
@@ -35,6 +40,11 @@ impl KeyTrigger {
             Self::Char(target) => target.eq_ignore_ascii_case(&c),
             _ => false,
         }
+    }
+
+    /// Whether this trigger represents a real keyboard interaction.
+    pub fn is_interactive(&self) -> bool {
+        !matches!(self, Self::None)
     }
 }
 
@@ -62,6 +72,22 @@ impl Action {
             id: id.into(),
             label: label.into(),
             trigger: KeyTrigger::Char(key),
+            description: None,
+            is_default: false,
+        }
+    }
+
+    /// Create a display-only next-step hint for non-interactive output.
+    ///
+    /// The hint keeps its `id` for machine consumers but renders as plain
+    /// guidance text with no key brackets, because no key actually works.
+    /// Prefer this over [`Action::new`] whenever the application cannot
+    /// really handle the keypress; real `Action` semantics are unchanged.
+    pub fn hint(id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            trigger: KeyTrigger::None,
             description: None,
             is_default: false,
         }

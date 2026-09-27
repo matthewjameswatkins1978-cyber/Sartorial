@@ -7,7 +7,7 @@ use std::io::{stdout, Write};
 #[derive(Parser, Debug)]
 #[command(
     name = "sartorial-demo",
-    version = "0.1.0",
+    version = "0.2.0",
     about = "Biscuit Logic CLI Presentation Standard Showcase",
     disable_help_subcommand = true
 )]
@@ -50,6 +50,8 @@ enum DemoCommand {
     Help,
     /// 12. Instant 4-way visual style comparison (House, Black Tie, Workwear, Studio)
     Styles,
+    /// 12b. No-colour silhouette proof: same screen x4, colour off, width 100
+    Silhouettes,
     /// 13. Full visual regression runway across all presets
     Runway,
     /// 14. Short live progress animation demo
@@ -71,7 +73,9 @@ fn build_tools_table() -> TableModel {
 }
 
 fn build_summary_screen() -> SummaryScreen {
-    SummaryScreen::new("SARTORIAL", Status::Ready)
+    // Mixed-case title on purpose: it exercises the preset casing grammar
+    // (House/Workwear uppercase it, Black Tie/Studio preserve it).
+    SummaryScreen::new("Sartorial", Status::Ready)
         .with_subtitle("Environment READY")
         .fact("Environment", "Windows 11")
         .fact("Architecture", "x86_64")
@@ -479,6 +483,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             run_preset_runway(Preset::BlackTie, &ctx)?;
             run_preset_runway(Preset::Workwear, &ctx)?;
             run_preset_runway(Preset::Studio, &ctx)?;
+        }
+        DemoCommand::Silhouettes => {
+            // Acceptance artifact: the SAME screen in all four presets with
+            // colour disabled. Each silhouette must stay identifiable.
+            let screen = build_summary_screen();
+            let presets = [
+                Preset::House,
+                Preset::BlackTie,
+                Preset::Workwear,
+                Preset::Studio,
+            ];
+            for p in presets {
+                println!("============================================================");
+                println!("SILHOUETTE (no colour): {}", p.name());
+                println!("============================================================");
+                let p_ctx = RenderContext::human_motion(p, MotionMode::Never)
+                    .with_config(
+                        Config::default()
+                            .with_preset(p)
+                            .with_color(ColorChoice::Never)
+                            .with_width(100),
+                    )
+                    .with_target(RenderTarget::Human);
+                render_visual(&screen, &p_ctx)?;
+                println!();
+            }
         }
         DemoCommand::LiveMotion => {
             println!("Starting 1.5s live motion demonstration...");

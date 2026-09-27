@@ -341,10 +341,14 @@ fn test_9_all_four_presets_preserve_semantic_content() {
             stdout.to_uppercase().contains("SYSTEM AUDIT"),
             "Missing title in {preset}"
         );
-        assert!(
-            stdout.contains("Cluster"),
-            "Missing key 'Cluster' in {preset}"
-        );
+        // Fact labels keep operator voice per preset: Workwear uppercases
+        // with a colon (presentation only; semantics unchanged).
+        let key = if preset == "workwear" {
+            "CLUSTER:"
+        } else {
+            "Cluster"
+        };
+        assert!(stdout.contains(key), "Missing key '{key}' in {preset}");
         assert!(
             stdout.contains("production-eu-1"),
             "Missing value in {preset}"
@@ -452,14 +456,20 @@ fn test_11_workwear_stream_progress_state_coherence() {
     assert_eq!(output.status.code(), Some(ExitCode::Success.as_i32()));
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    // In Workwear, [100/100] must be accompanied by 100%, and NEVER 0%
+    // Workwear v0.2 voice is operational, not bracketed: `✓ SCANNING
+    // REPOSITORY  100/100`. Real counts are foregrounded; no percentage is
+    // manufactured, so a stale 0% can never appear.
     assert!(
-        stderr.contains("[100/100] 100%"),
-        "Workwear must produce [100/100] 100% on completion, got:\n{stderr}"
+        stderr.contains("100/100"),
+        "Workwear must foreground real counts on completion, got:\n{stderr}"
     );
     assert!(
-        !stderr.contains("[100/100] 0%"),
-        "Workwear must NEVER produce [100/100] 0%!"
+        stderr.contains("SCANNING REPOSITORY"),
+        "Workwear must voice the task in uppercase, got:\n{stderr}"
+    );
+    assert!(
+        !stderr.contains("0%"),
+        "Workwear must NEVER produce a stale 0%!"
     );
 }
 
