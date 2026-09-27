@@ -24,10 +24,10 @@ pub mod clap_ext;
 
 // Re-export core semantic types at top-level for fast, ergonomic usage
 pub use components::{
-    ActionBar, Choice, Confirm, DetailView, ErrorView, KeyValueList, NoticeView, ProgressBar,
-    Section, StatusBadge, TableView, Title,
+    ActionBar, Choice, ChoiceOutcome, Confirm, ConfirmOutcome, DetailView, ErrorView, KeyValueList,
+    NoticeView, ProgressBar, Section, StatusBadge, TableView, Title,
 };
-pub use config::{BorderStyle, ColorChoice, Config, Density, SymbolMode};
+pub use config::{BorderStyle, ColorChoice, Config, Density, InteractiveMode, SymbolMode};
 pub use render::{
     AgentRenderer, HumanRenderer, PlainRenderer, RenderAgent, RenderContext, RenderHuman,
     RenderPlain, RenderTarget,
@@ -39,24 +39,24 @@ pub use semantic::{
 };
 
 /// Quick helper to render any displayable Sartorial item to stdout using default configuration.
-pub fn print_human<T>(item: &T)
+pub fn print_human<T>(item: &T) -> std::io::Result<()>
 where
     T: render::RenderHuman,
 {
     let ctx = RenderContext::detect();
     let mut out = anstream::stdout();
-    let _ = item.render_human(&ctx, &mut out);
+    item.render_human(&ctx, &mut out)
 }
 
 /// Quick helper to render an item as plain text.
-pub fn to_plain<T>(item: &T) -> String
+pub fn to_plain<T>(item: &T) -> std::io::Result<String>
 where
     T: render::RenderPlain,
 {
     let ctx = RenderContext::plain();
     let mut buf = Vec::new();
-    let _ = item.render_plain(&ctx, &mut buf);
-    String::from_utf8_lossy(&buf).into_owned()
+    item.render_plain(&ctx, &mut buf)?;
+    Ok(String::from_utf8_lossy(&buf).into_owned())
 }
 
 /// Quick helper to render an item as agent JSON.
@@ -64,5 +64,5 @@ pub fn to_agent_json<T>(item: &T) -> Result<String, serde_json::Error>
 where
     T: render::RenderAgent,
 {
-    item.render_agent_json(true)
+    item.to_agent_json(true)
 }

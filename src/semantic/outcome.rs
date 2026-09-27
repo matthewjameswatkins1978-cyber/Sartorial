@@ -206,3 +206,45 @@ impl RenderPlain for Outcome {
         Ok(())
     }
 }
+
+use crate::render::{RenderAgent, SARTORIAL_SCHEMA_VERSION};
+
+#[derive(Serialize)]
+struct AgentOutcomeRepresentation<'a> {
+    schema_version: &'static str,
+    status: Status,
+    title: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    summary: &'a Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    facts: &'a Vec<Fact>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    evidence: &'a Vec<Evidence>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    warnings: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    next_actions: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    details: &'a Option<String>,
+}
+
+impl RenderAgent for Outcome {
+    fn to_agent_json(&self, pretty: bool) -> Result<String, serde_json::Error> {
+        let rep = AgentOutcomeRepresentation {
+            schema_version: SARTORIAL_SCHEMA_VERSION,
+            status: self.status,
+            title: &self.title,
+            summary: &self.summary,
+            facts: &self.facts,
+            evidence: &self.evidence,
+            warnings: self.warnings.iter().map(|w| w.message.clone()).collect(),
+            next_actions: self.actions.iter().map(|a| a.id.clone()).collect(),
+            details: &self.details,
+        };
+        if pretty {
+            serde_json::to_string_pretty(&rep)
+        } else {
+            serde_json::to_string(&rep)
+        }
+    }
+}

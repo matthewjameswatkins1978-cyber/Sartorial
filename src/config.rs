@@ -83,7 +83,6 @@ impl SymbolMode {
     }
 }
 
-/// Interactivity preference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum InteractiveMode {
     /// Interactive only when stdin & stdout are interactive terminals.
@@ -93,6 +92,17 @@ pub enum InteractiveMode {
     On,
     /// Force non-interactive / deterministic fallback mode.
     Off,
+}
+
+impl InteractiveMode {
+    /// Evaluate interactivity using both stdin and stdout suitability.
+    pub fn is_interactive(&self, stdin_is_tty: bool, stdout_is_tty: bool) -> bool {
+        match self {
+            Self::On => true,
+            Self::Off => false,
+            Self::Auto => stdin_is_tty && stdout_is_tty,
+        }
+    }
 }
 
 /// Sartorial configuration embodying the Biscuit Logic CLI Presentation Standard.
@@ -174,5 +184,14 @@ impl Config {
     pub fn with_width(mut self, width: usize) -> Self {
         self.width = Some(width);
         self
+    }
+
+    /// Single authority for interactivity based on configuration and stream capabilities.
+    pub fn is_interactive(&self) -> bool {
+        use std::io::IsTerminal;
+        self.interactive.is_interactive(
+            std::io::stdin().is_terminal(),
+            std::io::stdout().is_terminal(),
+        )
     }
 }

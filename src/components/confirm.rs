@@ -1,16 +1,42 @@
+use crate::config::Config;
 use crate::interaction::{read_key, TerminalGuard};
 use crate::render::context::RenderContext;
 use crate::render::human::HumanRenderer;
 use crate::render::{RenderHuman, RenderPlain};
 use crate::semantic::action::KeyTrigger;
-use std::io::{self, stdout, IsTerminal, Write};
+use serde::{Deserialize, Serialize};
+use std::io::{self, stdout, Write};
 use std::time::Duration;
 
-/// Interactive or non-interactive confirmation prompt.
+/// Explicit result of a confirmation prompt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConfirmOutcome {
+    /// Explicitly accepted by user.
+    Confirmed,
+    /// Explicitly rejected by user.
+    Denied,
+    /// Cancelled via Esc or Ctrl+C.
+    Cancelled,
+    /// Denied automatically because environment was non-interactive and no fallback was authorized.
+    NonInteractiveDenied,
+    /// Resolved via explicitly authorized non-interactive fallback.
+    NonInteractiveFallback(bool),
+}
+
+impl ConfirmOutcome {
+    /// Convenience helper returning true only if confirmed or resolved by true fallback.
+    pub fn is_confirmed(&self) -> bool {
+        matches!(self, Self::Confirmed | Self::NonInteractiveFallback(true))
+    }
+}
+
+/// Confirmation prompt adhering to Biscuit Logic interaction authority and fail-closed safety.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Confirm {
     pub prompt: String,
     pub default_value: bool,
+    pub non_interactive_fallback: Option<bool>,
 }
 
 impl Confirm {
@@ -18,21 +44,38 @@ impl Confirm {
         Self {
             prompt: prompt.into(),
             default_value: true,
+            non_interactive_fallback: None,
         }
     }
 
+    /// Set default value chosen when Enter is pressed interactively.
     pub fn with_default(mut self, default_value: bool) -> Self {
         self.default_value = default_value;
         self
     }
 
-    /// Prompt interactively if supported, or fall back to default deterministically.
-    pub fn prompt_interactive(&self) -> io::Result<bool> {
-        if !stdout().is_terminal() {
-            return Ok(self.default_value);
+    /// Explicitly authorize a fallback value when executed non-interactively.
+    /// Without this, non-interactive execution will strictly fail-closed (`NonInteractiveDenied`).
+    pub fn with_non_interactive_fallback(mut self, fallback: bool) -> Self {
+        self.non_interactive_fallback = Some(fallback);
+        self
+    }
+
+    /// Run confirmation using default configuration.
+    pub fn prompt(&self) -> io::Result<ConfirmOutcome> {
+        self.prompt_with_config(&Config::default())
+    }
+
+    /// Run confirmation using the single authority of the provided configuration.
+    pub fn prompt_with_config(&self, config: &Config) -> io::Result<ConfirmOutcome> {
+        if !config.is_interactive() {
+            return match self.non_interactive_fallback {
+                Some(fb) => Ok(ConfirmOutcome::NonInteractiveFallback(fb)),
+                None => Ok(ConfirmOutcome::NonInteractiveDenied),
+            };
         }
 
-        let ctx = RenderContext::detect();
+        let ctx = RenderContext::detect().with_config(config.clone());
         self.render_human(&ctx, &mut stdout())?;
         stdout().flush()?;
 
@@ -40,10 +83,26 @@ impl Confirm {
         loop {
             if let Some(key) = read_key(Duration::from_millis(200))? {
                 match key {
-                    KeyTrigger::Enter => return Ok(self.default_value),
-                    KeyTrigger::Char('y') | KeyTrigger::Char('Y') => return Ok(true),
-                    KeyTrigger::Char('n') | KeyTrigger::Char('N') | KeyTrigger::Esc => {
-                        return Ok(false)
+                    KeyTrigger::Enter => {
+                        let outcome = if self.default_value {
+                            ConfirmOutcome::Confirmed
+                        } else {
+                            ConfirmOutcome::Denied
+                        };
+                        writeln!(stdout())?;
+                        return Ok(outcome);
+                    }
+                    KeyTrigger::Char('y') | KeyTrigger::Char('Y') => {
+                        writeln!(stdout())?;
+                        return Ok(ConfirmOutcome::Confirmed);
+                    }
+                    KeyTrigger::Char('n') | KeyTrigger::Char('N') => {
+                        writeln!(stdout())?;
+                        return Ok(ConfirmOutcome::Denied);
+                    }
+                    KeyTrigger::Esc => {
+                        writeln!(stdout())?;
+                        return Ok(ConfirmOutcome::Cancelled);
                     }
                     _ => {}
                 }

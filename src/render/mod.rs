@@ -4,7 +4,7 @@ pub mod human;
 pub mod plain;
 pub mod target;
 
-pub use agent::AgentRenderer;
+pub use agent::{AgentEnvelope, AgentRenderer, SARTORIAL_SCHEMA_VERSION};
 pub use context::{RenderContext, WidthCategory};
 pub use human::HumanRenderer;
 pub use plain::PlainRenderer;
@@ -34,16 +34,10 @@ pub trait RenderPlain {
     }
 }
 
-/// Trait for AI agent / machine JSON rendering.
-pub trait RenderAgent: serde::Serialize {
-    fn render_agent_json(&self, pretty: bool) -> Result<String, serde_json::Error> {
-        if pretty {
-            serde_json::to_string_pretty(self)
-        } else {
-            serde_json::to_string(self)
-        }
-    }
+/// Trait for types participating in the canonical Sartorial machine/agent protocol.
+///
+/// Unlike generic serialization, implementations of this trait produce a stable,
+/// schema-versioned JSON structure strictly bounded for context economy.
+pub trait RenderAgent {
+    fn to_agent_json(&self, pretty: bool) -> Result<String, serde_json::Error>;
 }
-
-// Blanket implementation of RenderAgent for any serde::Serialize type
-impl<T: serde::Serialize> RenderAgent for T {}

@@ -72,3 +72,37 @@ impl RenderPlain for ErrorModel {
         ErrorView::new(self.clone()).render_plain(ctx, out)
     }
 }
+
+use crate::render::{RenderAgent, SARTORIAL_SCHEMA_VERSION};
+use crate::semantic::status::Status;
+
+#[derive(Serialize)]
+struct AgentErrorRepresentation<'a> {
+    schema_version: &'static str,
+    status: Status,
+    what: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    why: &'a Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    evidence: &'a Vec<Evidence>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    next_actions: Vec<String>,
+}
+
+impl RenderAgent for ErrorModel {
+    fn to_agent_json(&self, pretty: bool) -> Result<String, serde_json::Error> {
+        let rep = AgentErrorRepresentation {
+            schema_version: SARTORIAL_SCHEMA_VERSION,
+            status: Status::Failed,
+            what: &self.what,
+            why: &self.why,
+            evidence: &self.evidence,
+            next_actions: self.next_actions.iter().map(|a| a.id.clone()).collect(),
+        };
+        if pretty {
+            serde_json::to_string_pretty(&rep)
+        } else {
+            serde_json::to_string(&rep)
+        }
+    }
+}

@@ -1,19 +1,44 @@
 use crate::components::section::Section;
-use crate::interaction::{read_key, TerminalGuard};
+use crate::config::Config;
+use crate::interaction::TerminalGuard;
 use crate::render::context::RenderContext;
 use crate::render::human::HumanRenderer;
 use crate::render::{RenderHuman, RenderPlain};
-use crate::semantic::action::KeyTrigger;
 use crate::semantic::choice::ChoiceItem;
-use std::io::{self, stdout, IsTerminal, Write};
-use std::time::Duration;
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::execute;
+use std::io::{self, stdout, Write};
 
-/// Interactive choice selection component.
+/// Explicit result of a choice selection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ChoiceOutcome<'a> {
+    /// Explicitly selected by human user.
+    Selected(&'a ChoiceItem),
+    /// Cancelled by human user (Esc or 'q').
+    Cancelled,
+    /// Denied automatically because environment was non-interactive and no fallback was authorized.
+    NonInteractiveDenied,
+    /// Resolved via explicitly authorized non-interactive fallback.
+    NonInteractiveFallback(&'a ChoiceItem),
+}
+
+impl<'a> ChoiceOutcome<'a> {
+    /// Get the resolved ChoiceItem if selected or resolved via fallback.
+    pub fn item(&self) -> Option<&'a ChoiceItem> {
+        match self {
+            Self::Selected(item) | Self::NonInteractiveFallback(item) => Some(item),
+            _ => None,
+        }
+    }
+}
+
+/// Interactive choice selection component adhering to interaction authority and fail-closed safety.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Choice {
     pub prompt: String,
     pub items: Vec<ChoiceItem>,
     pub selected_index: usize,
+    pub non_interactive_fallback: Option<usize>,
 }
 
 impl Choice {
@@ -22,9 +47,11 @@ impl Choice {
             prompt: prompt.into(),
             items,
             selected_index: 0,
+            non_interactive_fallback: None,
         }
     }
 
+    /// Set initial selected index for interactive navigation.
     pub fn with_default_index(mut self, index: usize) -> Self {
         if index < self.items.len() {
             self.selected_index = index;
@@ -32,51 +59,98 @@ impl Choice {
         self
     }
 
-    /// Run the interactive selector, or return default item deterministically in non-interactive mode.
-    pub fn select_interactive(&mut self) -> io::Result<Option<&ChoiceItem>> {
+    /// Explicitly authorize a fallback index when executed non-interactively.
+    /// Without this, non-interactive execution will strictly fail-closed (`NonInteractiveDenied`).
+    pub fn with_non_interactive_fallback(mut self, index: usize) -> Self {
+        if index < self.items.len() {
+            self.non_interactive_fallback = Some(index);
+        }
+        self
+    }
+
+    /// Execute selection using default configuration.
+    pub fn select(&mut self) -> io::Result<ChoiceOutcome<'_>> {
+        self.select_with_config(&Config::default())
+    }
+
+    /// Execute selection using the single authority of the provided configuration.
+    pub fn select_with_config(&mut self, config: &Config) -> io::Result<ChoiceOutcome<'_>> {
         if self.items.is_empty() {
-            return Ok(None);
+            return Ok(ChoiceOutcome::Cancelled);
         }
 
-        if !stdout().is_terminal() {
-            return Ok(self.items.get(self.selected_index));
+        // Single authority for interactivity: fail-closed if non-interactive and no fallback
+        if !config.is_interactive() {
+            return match self.non_interactive_fallback {
+                Some(idx) if idx < self.items.len() => {
+                    Ok(ChoiceOutcome::NonInteractiveFallback(&self.items[idx]))
+                }
+                _ => Ok(ChoiceOutcome::NonInteractiveDenied),
+            };
         }
 
-        let ctx = RenderContext::detect();
+        let ctx = RenderContext::detect().with_config(config.clone());
         let _guard = TerminalGuard::enter()?;
+        let mut out = stdout();
+
+        // Initial render
+        self.render_human(&ctx, &mut out)?;
+        out.flush()?;
+
+        let total_lines = (1 + self.items.len()) as u16;
 
         loop {
-            // Render options
-            let mut out = stdout();
-            self.render_human(&ctx, &mut out)?;
-            out.flush()?;
+            // Block until event is available: zero output or CPU usage while idle
+            if let Event::Key(KeyEvent {
+                code,
+                modifiers,
+                kind: KeyEventKind::Press,
+                ..
+            }) = crossterm::event::read()?
+            {
+                if modifiers.contains(KeyModifiers::CONTROL) && code == KeyCode::Char('c') {
+                    return Ok(ChoiceOutcome::Cancelled);
+                }
 
-            if let Some(key) = read_key(Duration::from_millis(200))? {
-                match key {
-                    KeyTrigger::Up => {
+                let mut changed = false;
+                match code {
+                    KeyCode::Up => {
                         if self.selected_index > 0 {
                             self.selected_index -= 1;
+                            changed = true;
                         }
                     }
-                    KeyTrigger::Down => {
+                    KeyCode::Down => {
                         if self.selected_index + 1 < self.items.len() {
                             self.selected_index += 1;
+                            changed = true;
                         }
                     }
-                    KeyTrigger::Enter => {
-                        return Ok(self.items.get(self.selected_index));
+                    KeyCode::Enter => {
+                        return Ok(ChoiceOutcome::Selected(&self.items[self.selected_index]));
                     }
-                    KeyTrigger::Esc | KeyTrigger::Char('q') => {
-                        return Ok(None);
+                    KeyCode::Esc | KeyCode::Char('q') => {
+                        return Ok(ChoiceOutcome::Cancelled);
                     }
-                    KeyTrigger::Char(c) if c.is_ascii_digit() => {
+                    KeyCode::Char(c) if c.is_ascii_digit() => {
                         let num = c.to_digit(10).unwrap_or(0) as usize;
                         if num >= 1 && num <= self.items.len() {
                             self.selected_index = num - 1;
-                            return Ok(self.items.get(self.selected_index));
+                            return Ok(ChoiceOutcome::Selected(&self.items[self.selected_index]));
                         }
                     }
                     _ => {}
+                }
+
+                // Bounded redraw only when state actually changed
+                if changed {
+                    execute!(out, crossterm::cursor::MoveToPreviousLine(total_lines))?;
+                    execute!(
+                        out,
+                        crossterm::terminal::Clear(crossterm::terminal::ClearType::FromCursorDown)
+                    )?;
+                    self.render_human(&ctx, &mut out)?;
+                    out.flush()?;
                 }
             }
         }

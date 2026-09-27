@@ -1,4 +1,5 @@
 use sartorial::*;
+use unicode_width::UnicodeWidthStr;
 
 #[test]
 fn test_narrow_terminal_stacking() {
@@ -65,4 +66,50 @@ fn test_unicode_and_ascii_symbol_modes() {
 
     assert_eq!(failed_badge.to_human_string(&unicode_ctx), "× FAILED");
     assert_eq!(failed_badge.to_human_string(&ascii_ctx), "[X] FAILED");
+}
+
+#[test]
+fn test_hostile_long_cells_narrow_table_enforces_width() {
+    let mut table = TableModel::new(vec!["Component", "Path", "Status"]);
+    let hostile_long_path = "D:\\Very\\Long\\Deeply\\Nested\\Directory\\Structure\\With\\Excessively\\Long\\Path\\Names\\That\\Exceed\\Terminal\\Width\\Entirely\\target\\release\\hostile_binary_name.exe";
+    table.add_row(["Engine", hostile_long_path, "ready"]);
+    table.add_row(["Parser", "src/parser/lexer.rs", "attention"]);
+
+    let view = TableView::new(table);
+
+    // Hostile narrow width: only 40 columns
+    let ctx = RenderContext::plain().with_width(40);
+    let plain_output = view.to_plain_string(&ctx);
+
+    // Verify EVERY line strictly conforms to width <= 40
+    for line in plain_output.lines() {
+        let display_width = UnicodeWidthStr::width(line);
+        assert!(
+            display_width <= 40,
+            "Line exceeded 40 columns (width = {display_width}): '{line}'"
+        );
+    }
+
+    // Verify truncation indicator was used on the hostile path
+    assert!(plain_output.contains("…") || plain_output.contains("..."));
+}
+
+#[test]
+fn test_unicode_cjk_width_handling() {
+    let mut table = TableModel::new(vec!["Service", "Note", "Status"]);
+    // CJK characters occupy 2 display cells each
+    table.add_row(["東京クラスタ", "本番環境データセンター", "ready"]);
+    table.add_row(["London", "UK Primary", "ready"]);
+
+    let view = TableView::new(table);
+    let ctx = RenderContext::plain().with_width(45);
+    let plain_output = view.to_plain_string(&ctx);
+
+    for line in plain_output.lines() {
+        let display_width = UnicodeWidthStr::width(line);
+        assert!(
+            display_width <= 45,
+            "Line exceeded 45 columns (width = {display_width}): '{line}'"
+        );
+    }
 }

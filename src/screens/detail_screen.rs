@@ -196,3 +196,39 @@ impl RenderPlain for DetailScreen {
         Ok(())
     }
 }
+
+use crate::render::{RenderAgent, SARTORIAL_SCHEMA_VERSION};
+
+#[derive(Serialize)]
+struct AgentDetailRepresentation<'a> {
+    schema_version: &'static str,
+    status: Status,
+    title: &'a str,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    facts: &'a Vec<Fact>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    evidence: &'a Option<Evidence>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    warnings: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    next_actions: Vec<String>,
+}
+
+impl RenderAgent for DetailScreen {
+    fn to_agent_json(&self, pretty: bool) -> Result<String, serde_json::Error> {
+        let rep = AgentDetailRepresentation {
+            schema_version: SARTORIAL_SCHEMA_VERSION,
+            status: self.status,
+            title: &self.title,
+            facts: &self.facts,
+            evidence: &self.evidence,
+            warnings: self.notices.iter().map(|n| n.message.clone()).collect(),
+            next_actions: self.actions.iter().map(|a| a.id.clone()).collect(),
+        };
+        if pretty {
+            serde_json::to_string_pretty(&rep)
+        } else {
+            serde_json::to_string(&rep)
+        }
+    }
+}

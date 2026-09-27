@@ -13,8 +13,8 @@ pub mod table;
 pub mod title;
 
 pub use action_bar::ActionBar;
-pub use choice::Choice;
-pub use confirm::Confirm;
+pub use choice::{Choice, ChoiceOutcome};
+pub use confirm::{Confirm, ConfirmOutcome};
 pub use detail_view::DetailView;
 pub use error::ErrorView;
 pub use key_value::KeyValueList;

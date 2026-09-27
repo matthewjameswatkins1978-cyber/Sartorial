@@ -86,3 +86,33 @@ impl TableModel {
         self
     }
 }
+
+use crate::render::{RenderAgent, SARTORIAL_SCHEMA_VERSION};
+
+#[derive(Serialize)]
+struct AgentTableRepresentation<'a> {
+    schema_version: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    title: &'a Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    badge: &'a Option<String>,
+    headers: &'a [String],
+    rows: &'a [TableRow],
+}
+
+impl RenderAgent for TableModel {
+    fn to_agent_json(&self, pretty: bool) -> Result<String, serde_json::Error> {
+        let rep = AgentTableRepresentation {
+            schema_version: SARTORIAL_SCHEMA_VERSION,
+            title: &self.title,
+            badge: &self.badge,
+            headers: &self.headers,
+            rows: &self.rows,
+        };
+        if pretty {
+            serde_json::to_string_pretty(&rep)
+        } else {
+            serde_json::to_string(&rep)
+        }
+    }
+}

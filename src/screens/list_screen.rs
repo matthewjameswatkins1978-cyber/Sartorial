@@ -113,3 +113,39 @@ impl RenderPlain for ListScreen {
         Ok(())
     }
 }
+
+use crate::render::{RenderAgent, SARTORIAL_SCHEMA_VERSION};
+use crate::semantic::status::Status;
+
+#[derive(Serialize)]
+struct AgentListRepresentation<'a> {
+    schema_version: &'static str,
+    status: Status,
+    title: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    count_badge: &'a Option<String>,
+    table: &'a TableModel,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    warnings: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    next_actions: Vec<String>,
+}
+
+impl RenderAgent for ListScreen {
+    fn to_agent_json(&self, pretty: bool) -> Result<String, serde_json::Error> {
+        let rep = AgentListRepresentation {
+            schema_version: SARTORIAL_SCHEMA_VERSION,
+            status: Status::Ready,
+            title: &self.title,
+            count_badge: &self.count_badge,
+            table: &self.table,
+            warnings: self.notices.iter().map(|n| n.message.clone()).collect(),
+            next_actions: self.actions.iter().map(|a| a.id.clone()).collect(),
+        };
+        if pretty {
+            serde_json::to_string_pretty(&rep)
+        } else {
+            serde_json::to_string(&rep)
+        }
+    }
+}

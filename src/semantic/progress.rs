@@ -60,3 +60,42 @@ impl ProgressState {
         self
     }
 }
+
+use crate::render::{RenderAgent, SARTORIAL_SCHEMA_VERSION};
+
+#[derive(Serialize)]
+struct AgentProgressRepresentation<'a> {
+    schema_version: &'static str,
+    task: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    subtask: &'a Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    current: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    total: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    unit: &'a Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    elapsed_secs: Option<u64>,
+    status: Status,
+}
+
+impl RenderAgent for ProgressState {
+    fn to_agent_json(&self, pretty: bool) -> Result<String, serde_json::Error> {
+        let rep = AgentProgressRepresentation {
+            schema_version: SARTORIAL_SCHEMA_VERSION,
+            task: &self.task,
+            subtask: &self.subtask,
+            current: self.current,
+            total: self.total,
+            unit: &self.unit,
+            elapsed_secs: self.elapsed_secs,
+            status: self.status,
+        };
+        if pretty {
+            serde_json::to_string_pretty(&rep)
+        } else {
+            serde_json::to_string(&rep)
+        }
+    }
+}

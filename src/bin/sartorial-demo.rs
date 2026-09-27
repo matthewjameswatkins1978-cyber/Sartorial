@@ -130,7 +130,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         DemoCommand::Summary => {
             let screen = build_summary_screen();
             if ctx.target.is_agent() {
-                println!("{}", serde_json::to_string_pretty(&screen)?);
+                println!("{}", screen.to_agent_json(true)?);
             } else {
                 render_visual(&screen, &ctx)?;
             }
@@ -138,7 +138,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         DemoCommand::Table => {
             let table = build_tools_table();
             if ctx.target.is_agent() {
-                println!("{}", serde_json::to_string_pretty(&table)?);
+                println!("{}", table.to_agent_json(true)?);
             } else {
                 let view = TableView::new(table);
                 render_visual(&view, &ctx)?;
@@ -147,7 +147,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         DemoCommand::Error { unknown_cause } => {
             let err = build_error(unknown_cause);
             if ctx.target.is_agent() {
-                println!("{}", serde_json::to_string_pretty(&err)?);
+                println!("{}", err.to_agent_json(true)?);
             } else {
                 let view = ErrorView::new(err);
                 render_visual(&view, &ctx)?;
@@ -161,22 +161,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ChoiceItem::new("local", "Local Dev")
                     .with_description("Developer workstation sandbox"),
             ];
-            let choice = Choice::new("Select deployment environment:", items.clone());
+            let mut choice = Choice::new("Select deployment environment:", items.clone())
+                .with_non_interactive_fallback(0);
             if ctx.target.is_agent() {
                 println!("{}", serde_json::to_string_pretty(&items)?);
             } else if ctx.target.is_plain() {
                 choice.render_plain(&ctx, &mut stdout())?;
+            } else if ctx.config.is_interactive() {
+                let outcome = choice.select_with_config(&ctx.config)?;
+                match outcome {
+                    ChoiceOutcome::Selected(item) => {
+                        println!("\nSelected: {} ({})", item.label, item.id)
+                    }
+                    ChoiceOutcome::Cancelled => println!("\nSelection cancelled."),
+                    ChoiceOutcome::NonInteractiveFallback(item) => {
+                        println!("\nNon-interactive fallback: {}", item.label)
+                    }
+                    ChoiceOutcome::NonInteractiveDenied => {
+                        println!("\nNon-interactive selection denied.")
+                    }
+                }
             } else {
                 choice.render_human(&ctx, &mut stdout())?;
             }
         }
         DemoCommand::Confirm => {
-            let confirm = Confirm::new("Apply configuration changes?").with_default(true);
+            let confirm = Confirm::new("Apply configuration changes?")
+                .with_default(true)
+                .with_non_interactive_fallback(false);
             if ctx.target.is_agent() {
                 println!(r#"{{"prompt": "Apply configuration changes?", "default": true}}"#);
             } else if ctx.target.is_plain() {
                 confirm.render_plain(&ctx, &mut stdout())?;
                 println!();
+            } else if ctx.config.is_interactive() {
+                let outcome = confirm.prompt_with_config(&ctx.config)?;
+                println!("\nOutcome: {:?}", outcome);
             } else {
                 confirm.render_human(&ctx, &mut stdout())?;
                 println!();
@@ -189,7 +209,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             pb.finish_with_status(Status::Ready);
 
             if ctx.target.is_agent() {
-                println!("{}", serde_json::to_string_pretty(pb.state())?);
+                println!("{}", pb.state().to_agent_json(true)?);
             } else {
                 render_visual(&pb, &ctx)?;
             }
@@ -220,7 +240,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         DemoCommand::Narrow => {
             let screen = build_summary_screen();
             if ctx.target.is_agent() {
-                println!("{}", serde_json::to_string_pretty(&screen)?);
+                println!("{}", screen.to_agent_json(true)?);
             } else {
                 render_visual(&screen, &ctx)?;
             }

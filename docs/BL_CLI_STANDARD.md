@@ -131,10 +131,14 @@ Sartorial is explicitly engineered for **Context Economy**: reducing unnecessary
 1. **Minimum Sufficient Evidence First**: Return only the essential summary, location, and reference handle in the primary response.
 2. **Opt-in Progressive Disclosure**: Full raw build logs or compiler transcripts must not be dumped into the primary output. Provide an evidence handle (e.g. `clippy:log-042`) and let the agent or human opt in with `[D] Details`.
 3. **Structured Agent JSON (`--json`)**:
-   - Deterministic JSON output conforming to stable schema.
+   - Strict adherence to the canonical Sartorial Agent schema version (`schema_version: "sartorial.v0.1"`).
    - Zero ANSI escape sequences (`\x1b`).
    - Typed arrays instead of decorative prose paragraphs.
-   - Explicit next actions exposed as machine-readable arrays (`"next_actions": ["retry", "details"]`).
+   - Explicit next actions exposed as machine-readable string ID arrays (`"next_actions": ["retry", "details"]`).
+4. **Interaction Authority & Fail-Closed Safety**:
+   - `Config::InteractiveMode` (`Auto`, `On`, `Off`) is the single authority for interactivity across all components.
+   - `Auto` requires both stdin and stdout to be interactive streams.
+   - Prompts (`Confirm`, `Choice`) are strictly **fail-closed** when non-interactive. They never silently assume confirmation or selection unless the caller explicitly configures a non-interactive fallback.
 
 ---
 
