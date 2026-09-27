@@ -41,6 +41,40 @@ fn workwear_plain_preset_is_ascii_safe() {
 }
 
 #[test]
+fn plain_preset_survives_later_unicode_config() {
+    // Reverse call order: a Plain context re-configured with a
+    // Unicode-requesting config must stay pure ASCII and stay Plain.
+    // Target invariants are authoritative regardless of builder order.
+    let ctx = RenderContext::plain_preset(Preset::Workwear).with_config(
+        Config::default()
+            .with_preset(Preset::Workwear)
+            .with_symbols(SymbolMode::Unicode)
+            .with_width(100),
+    );
+    assert_eq!(ctx.target, RenderTarget::Plain);
+    assert!(!ctx.color_enabled);
+    assert_eq!(ctx.symbols, SymbolMode::Ascii);
+    assert_eq!(ctx.style.title_marker, "> ");
+    assert_eq!(ctx.style.section_marker, "> ");
+    assert_eq!(ctx.style.rule_char, '-');
+    let out = rich_screen().to_plain_string(&ctx).unwrap();
+    assert!(
+        out.contains("> "),
+        "ASCII operator marker expected, got:\n{out}"
+    );
+    assert!(
+        out.is_ascii(),
+        "plain output must stay pure ASCII after Unicode config, got:\n{out}"
+    );
+    for glyph in ['»', '✓', '×', '●', '○', '–', '─', '↑', '↓', '←', '→'] {
+        assert!(
+            !out.contains(glyph),
+            "plain output leaked {glyph:?}:\n{out}"
+        );
+    }
+}
+
+#[test]
 fn with_target_plain_re_resolves_unicode_markers() {
     // Resolve Unicode grammar first (as a TTY session would), then switch
     // to Plain: no stale Unicode structural marker may survive the switch.

@@ -99,6 +99,28 @@ impl RenderContext {
         ctx
     }
 
+    /// Re-apply the invariants of the current target after any mutation.
+    ///
+    /// Single authority for target-specific overrides, so builder-call
+    /// order cannot matter: both [`Self::with_config`] and
+    /// [`Self::with_target`] funnel through here. Plain output is pipe-safe
+    /// ASCII — every symbol-dependent grammar decision is forced back to
+    /// ASCII no matter what the config resolved. (Badges and rules read
+    /// `symbols` live at render time, so flipping the mode covers them.)
+    fn apply_target_overrides(&mut self) {
+        if self.target.is_plain() || self.target.is_agent() {
+            self.color_enabled = false;
+            self.style.color_enabled = false;
+        }
+        if self.target.is_plain() {
+            self.symbols = SymbolMode::Ascii;
+            self.style.symbols = SymbolMode::Ascii;
+            self.style.title_marker = self.style.preset.ascii_structural_marker();
+            self.style.section_marker = self.style.preset.ascii_structural_marker();
+            self.style.rule_char = self.style.preset.rule_char(SymbolMode::Ascii);
+        }
+    }
+
     /// Set an explicit configuration.
     pub fn with_config(mut self, config: Config) -> Self {
         let is_tty = std::io::stdout().is_terminal();
@@ -109,29 +131,14 @@ impl RenderContext {
             self.width = w;
         }
         self.config = config;
+        self.apply_target_overrides();
         self
     }
 
     /// Set an explicit target.
     pub fn with_target(mut self, target: RenderTarget) -> Self {
         self.target = target;
-        if target.is_plain() || target.is_agent() {
-            self.color_enabled = false;
-            self.style.color_enabled = false;
-        }
-        if target.is_plain() {
-            // Plain output is pipe-safe ASCII: re-resolve every
-            // symbol-dependent grammar decision. Markers and the rule
-            // character were fixed at config-resolution time and would
-            // otherwise leak Unicode structural glyphs (e.g. `» `, `─`)
-            // into output that promised ASCII. Badges and rules read
-            // `symbols` live at render time, so flipping the mode covers them.
-            self.symbols = SymbolMode::Ascii;
-            self.style.symbols = SymbolMode::Ascii;
-            self.style.title_marker = self.style.preset.ascii_structural_marker();
-            self.style.section_marker = self.style.preset.ascii_structural_marker();
-            self.style.rule_char = self.style.preset.rule_char(SymbolMode::Ascii);
-        }
+        self.apply_target_overrides();
         self
     }
 
