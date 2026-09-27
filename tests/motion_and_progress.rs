@@ -21,7 +21,7 @@ fn test_unknown_total_never_fabricates_percentage() {
 
 #[test]
 fn test_count_produces_correct_progress_and_derives_percent() {
-    let p = ProgressBar::count("Scanning files", 38, 60);
+    let p = ProgressBar::count("Scanning files", 38, 60).unwrap();
 
     assert_eq!(p.state().mode, ProgressMode::Count);
     assert_eq!(p.state().current, Some(38));
@@ -79,7 +79,7 @@ fn test_motion_mode_policy() {
 #[test]
 fn test_zero_total_semantics_0_0_and_1_0_never_derive_100_percent() {
     // 0/0 case: completed 0 of 0 items
-    let p0 = ProgressBar::count("Zero total tasks", 0, 0);
+    let p0 = ProgressBar::count("Zero total tasks", 0, 0).unwrap();
     assert_eq!(p0.state().mode, ProgressMode::Count);
     assert_eq!(p0.state().current, Some(0));
     assert_eq!(p0.state().total, Some(0));
@@ -103,31 +103,18 @@ fn test_zero_total_semantics_0_0_and_1_0_never_derive_100_percent() {
     assert_eq!(val0["total"], 0);
     assert!(val0.get("percent").is_none());
 
-    // 1/0 case: completed 1 of 0 items
-    let p1 = ProgressBar::count("Overflow zero tasks", 1, 0);
-    assert_eq!(p1.state().current, Some(1));
-    assert_eq!(p1.state().total, Some(0));
-    assert_eq!(p1.state().percent, None); // NEVER Some(100)
-    assert_eq!(p1.state().derived_percent(), None);
-
-    let plain1 = p1.to_plain_string(&ctx_plain).unwrap();
-    assert!(plain1.contains("(1/0)"));
-    assert!(!plain1.contains("100%"));
-
-    let human1 = p1.to_human_string(&ctx_ww).unwrap();
-    assert!(human1.contains("[1/0]"));
-    assert!(!human1.contains("100%"));
-
-    let json1 = p1.state().to_agent_json(false).unwrap();
-    let val1: Value = serde_json::from_str(&json1).unwrap();
-    assert_eq!(val1["current"], 1);
-    assert_eq!(val1["total"], 0);
-    assert!(val1.get("percent").is_none());
+    assert!(matches!(
+        ProgressBar::count("Overflow zero tasks", 1, 0),
+        Err(ProgressError::CurrentExceedsTotal {
+            current: 1,
+            total: 0
+        })
+    ));
 }
 
 #[test]
 fn test_contradictory_progress_input_enforces_single_authority() {
-    let mut p = ProgressBar::count("Processing batch", 0, 100);
+    let mut p = ProgressBar::count("Processing batch", 0, 100).unwrap();
 
     // 1. Current exceeding total is rejected
     let res_exceed = p.apply_update(Some(105), None, None, None, None);
@@ -175,15 +162,79 @@ fn test_contradictory_progress_input_enforces_single_authority() {
 
     // 6. Prohibit states such as "50 / 100  12%" in presentation:
     // Even if a raw state were maliciously crafted, derived_percent is single authority
-    let mut hostile_state = ProgressState::count("Hostile task", 50, 100);
+    let mut hostile_state = ProgressState::count("Hostile task", 50, 100).unwrap();
     hostile_state.percent = Some(12); // forcibly setting raw field
     assert_eq!(hostile_state.derived_percent(), Some(50)); // single authority overrides!
 
     let cfg_ww = Config::new().with_preset(Preset::Workwear);
     let ctx_ww = RenderContext::detect().with_config(cfg_ww);
-    let mut hostile_pb = ProgressBar::count("Hostile task", 50, 100);
+    let mut hostile_pb = ProgressBar::count("Hostile task", 50, 100).unwrap();
     hostile_pb.state_mut().percent = Some(12);
     let human_out = hostile_pb.to_human_string(&ctx_ww).unwrap();
     assert!(human_out.contains("[50/100] 50%"));
     assert!(!human_out.contains("12%"));
+}
+
+#[test]
+fn test_native_construction_rejects_invalid_counts_and_zero_total_stays_indeterminate() {
+    assert!(matches!(
+        ProgressState::count("too far", 101, 100),
+        Err(ProgressError::CurrentExceedsTotal {
+            current: 101,
+            total: 100
+        })
+    ));
+    assert!(matches!(
+        ProgressBar::rate("too far", 2, 1, "items", "1/s"),
+        Err(ProgressError::CurrentExceedsTotal {
+            current: 2,
+            total: 1
+        })
+    ));
+    assert!(matches!(
+        ProgressBar::activity("empty").with_progress(1, 0, "items"),
+        Err(ProgressError::CurrentExceedsTotal {
+            current: 1,
+            total: 0
+        })
+    ));
+
+    let zero = ProgressState::count("empty", 0, 0).unwrap();
+    assert_eq!(zero.percent, None);
+    assert_eq!(zero.derived_percent(), None);
+    assert!(matches!(
+        zero.clone().with_progress(1, 0, "items"),
+        Err(ProgressError::CurrentExceedsTotal { .. })
+    ));
+    let invalid_json = r#"{"task":"bad","mode":"count","current":2,"total":1,"status":"running"}"#;
+    assert!(serde_json::from_str::<ProgressState>(invalid_json).is_err());
+}
+
+#[test]
+fn test_invalid_mutated_native_state_cannot_render_or_serialize_as_valid() {
+    let mut bar = ProgressBar::count("scan", 0, 10).unwrap();
+    bar.state_mut().current = Some(11);
+    assert_eq!(
+        bar.to_plain_string(&RenderContext::plain())
+            .unwrap_err()
+            .kind(),
+        std::io::ErrorKind::InvalidInput
+    );
+    assert_eq!(
+        bar.to_human_string(&RenderContext::plain())
+            .unwrap_err()
+            .kind(),
+        std::io::ErrorKind::InvalidInput
+    );
+    assert!(bar.state().to_agent_json(false).is_err());
+
+    let mut total_update = ProgressState::count("scan", 4, 5).unwrap();
+    assert!(matches!(
+        total_update.update_total(3),
+        Err(ProgressError::CurrentExceedsTotal {
+            current: 4,
+            total: 3
+        })
+    ));
+    assert_eq!(total_update.total, Some(5));
 }

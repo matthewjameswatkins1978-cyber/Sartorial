@@ -31,11 +31,11 @@ impl ProgressBar {
         }
     }
 
-    pub fn count(task: impl Into<String>, current: u64, total: u64) -> Self {
-        Self {
-            state: ProgressState::count(task, current, total),
+    pub fn count(task: impl Into<String>, current: u64, total: u64) -> Result<Self, ProgressError> {
+        Ok(Self {
+            state: ProgressState::count(task, current, total)?,
             indicatif_bar: None,
-        }
+        })
     }
 
     pub fn percent(task: impl Into<String>, percent: u8) -> Self {
@@ -58,11 +58,11 @@ impl ProgressBar {
         total: u64,
         unit: impl Into<String>,
         rate: impl Into<String>,
-    ) -> Self {
-        Self {
-            state: ProgressState::rate(task, current, total, unit, rate),
+    ) -> Result<Self, ProgressError> {
+        Ok(Self {
+            state: ProgressState::rate(task, current, total, unit, rate)?,
             indicatif_bar: None,
-        }
+        })
     }
 
     pub fn with_subtask(mut self, subtask: impl Into<String>) -> Self {
@@ -70,9 +70,14 @@ impl ProgressBar {
         self
     }
 
-    pub fn with_progress(mut self, current: u64, total: u64, unit: impl Into<String>) -> Self {
-        self.state = self.state.with_progress(current, total, unit);
-        self
+    pub fn with_progress(
+        mut self,
+        current: u64,
+        total: u64,
+        unit: impl Into<String>,
+    ) -> Result<Self, ProgressError> {
+        self.state = self.state.with_progress(current, total, unit)?;
+        Ok(self)
     }
 
     pub fn with_elapsed(mut self, elapsed_secs: u64) -> Self {
@@ -120,8 +125,8 @@ impl ProgressBar {
         self.state.update_current(cur)
     }
 
-    pub fn update_total(&mut self, tot: u64) {
-        self.state.update_total(tot);
+    pub fn update_total(&mut self, tot: u64) -> Result<(), ProgressError> {
+        self.state.update_total(tot)
     }
 
     pub fn update_percent(&mut self, pct: u8) -> Result<(), ProgressError> {
@@ -149,6 +154,9 @@ impl ProgressBar {
 
     /// Single authority for beginning live progress presentation with explicit TTY capability.
     pub fn start_live_with_tty(&mut self, ctx: &RenderContext, is_tty: bool) -> io::Result<()> {
+        self.state
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
         if ctx.should_animate(is_tty) {
             let pb = indicatif::ProgressBar::new_spinner();
             pb.enable_steady_tick(Duration::from_millis(100)); // 10 Hz rate limit
@@ -302,6 +310,9 @@ impl ProgressBar {
 
 impl RenderHuman for ProgressBar {
     fn render_human(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
+        self.state
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
         let is_ascii = ctx.symbols == SymbolMode::Ascii;
         let treatment = ctx.style.progress_treatment;
 
@@ -446,6 +457,9 @@ impl RenderHuman for ProgressBar {
 
 impl RenderPlain for ProgressBar {
     fn render_plain(&self, ctx: &RenderContext, out: &mut dyn Write) -> io::Result<()> {
+        self.state
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
         PlainRenderer::write_status(out, self.state.status, ctx)?;
         write!(out, " {}", self.state.task)?;
         if let Some(ref subtask) = self.state.subtask {

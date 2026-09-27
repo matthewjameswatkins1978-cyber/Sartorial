@@ -181,6 +181,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     } => {
                         let mut pb = if let Some(tot) = total {
                             ProgressBar::count(activity, 0, tot)
+                                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
                         } else {
                             ProgressBar::activity(activity)
                         };
@@ -188,7 +189,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             pb = pb.with_subtask(sub);
                         }
                         if let (Some(tot), Some(u)) = (total, unit) {
-                            pb = pb.with_progress(0, tot, u);
+                            pb = pb
+                                .with_progress(0, tot, u)
+                                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
                         }
                         pb.start_live(&ctx)?;
                         active_bars.insert(id, pb);

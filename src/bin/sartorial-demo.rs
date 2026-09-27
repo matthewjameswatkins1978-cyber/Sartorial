@@ -258,12 +258,12 @@ fn run_preset_runway(
     render_visual(&p_activity, &ctx)?;
 
     println!("\n--- 12. PROGRESS: COUNT (KNOWN ITEMS) ---");
-    let p_count = ProgressBar::count("Scanning files", 38, 60).with_elapsed(4);
+    let p_count = ProgressBar::count("Scanning files", 38, 60)?.with_elapsed(4);
     render_visual(&p_count, &ctx)?;
 
     println!("\n--- 13. PROGRESS: PERCENT (KNOWN PROGRESS BAR) ---");
     let p_percent = ProgressBar::percent("Building", 63)
-        .with_progress(38, 60, "crates")
+        .with_progress(38, 60, "crates")?
         .with_elapsed(9);
     render_visual(&p_percent, &ctx)?;
 
@@ -273,7 +273,7 @@ fn run_preset_runway(
 
     println!("\n--- 15. PROGRESS: RATE (THROUGHPUT) ---");
     let p_rate =
-        ProgressBar::rate("Downloading artifacts", 84, 140, "MB", "11 MB/s").with_elapsed(7);
+        ProgressBar::rate("Downloading artifacts", 84, 140, "MB", "11 MB/s")?.with_elapsed(7);
     render_visual(&p_rate, &ctx)?;
 
     println!("\n--- 16. PROGRESS: COMPLETED ---");

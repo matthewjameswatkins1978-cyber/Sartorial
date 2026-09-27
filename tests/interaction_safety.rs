@@ -142,12 +142,12 @@ fn test_piped_stdin_does_not_block_progress_animation_on_attended_tty() {
     assert!(!ctx.should_animate(false)); // Output is redirected -> motion prohibited
 
     // Deterministic proof: ProgressBar live animation starts when output stream is TTY
-    let mut pb_tty = ProgressBar::count("Compiling crates", 0, 10);
+    let mut pb_tty = ProgressBar::count("Compiling crates", 0, 10).unwrap();
     pb_tty.start_live_with_tty(&ctx, true).unwrap();
     assert!(pb_tty.is_animating());
 
     // And does NOT start when output stream is non-TTY
-    let mut pb_non_tty = ProgressBar::count("Compiling crates", 0, 10);
+    let mut pb_non_tty = ProgressBar::count("Compiling crates", 0, 10).unwrap();
     pb_non_tty.start_live_with_tty(&ctx, false).unwrap();
     assert!(!pb_non_tty.is_animating());
 }

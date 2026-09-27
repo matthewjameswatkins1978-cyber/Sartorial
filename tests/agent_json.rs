@@ -72,6 +72,7 @@ fn test_progress_state_agent_json() {
     let mut pb = ProgressBar::new("Checking repository")
         .with_subtask("cargo test")
         .with_progress(9, 11, "crates")
+        .unwrap()
         .with_elapsed(47);
     pb.finish_with_status(Status::Ready);
 
