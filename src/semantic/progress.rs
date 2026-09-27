@@ -138,37 +138,132 @@ impl ProgressState {
         self
     }
 
+    /// Derive the truthful progress percentage.
+    ///
+    /// Semantic authority rules:
+    /// - If `current` and `total` are known:
+    ///   - If `total > 0`, percent is derived: `(current * 100) / total`, bounded to 100.
+    ///   - If `total == 0`, percent is `None` (never derive fake 100%).
+    /// - Otherwise, if only explicit `percent` is known, returns bounded `percent`.
+    pub fn derived_percent(&self) -> Option<u8> {
+        match (self.current, self.total) {
+            (Some(cur), Some(tot)) if tot > 0 => {
+                Some(((cur.saturating_mul(100)) / tot).min(100) as u8)
+            }
+            (Some(_), Some(0)) => None,
+            _ => self.percent.map(|p| p.min(100)),
+        }
+    }
+
+    /// Apply an update enforcing single authority and semantic invariants:
+    /// - `current > total` is rejected with `CurrentExceedsTotal`
+    /// - `percent > 100` is rejected with `PercentOutOfRange`
+    /// - If `current` and `total` exist (total > 0), percent is derived.
+    ///   Any explicit percent MUST agree with derived percent or is rejected with `PercentContradiction`.
+    /// - If `total == 0`, derived percent is None. Explicit percent is rejected with `PercentContradiction`.
+    /// - If only `percent` is updated, mode transitions to `Percent` if no count exists.
+    pub fn apply_update(
+        &mut self,
+        current: Option<u64>,
+        percent: Option<u8>,
+        rate: Option<String>,
+        elapsed_secs: Option<u64>,
+        subtask: Option<String>,
+    ) -> Result<(), ProgressError> {
+        let new_current = current.or(self.current);
+        let new_total = self.total;
+
+        if let (Some(cur), Some(tot)) = (new_current, new_total) {
+            if cur > tot {
+                return Err(ProgressError::CurrentExceedsTotal {
+                    current: cur,
+                    total: tot,
+                });
+            }
+        }
+
+        let derived = match (new_current, new_total) {
+            (Some(cur), Some(tot)) if tot > 0 => {
+                Some(((cur.saturating_mul(100)) / tot).min(100) as u8)
+            }
+            _ => None,
+        };
+
+        if let Some(exp) = percent {
+            if exp > 100 {
+                return Err(ProgressError::PercentOutOfRange { percent: exp });
+            }
+            if let Some(d) = derived {
+                if exp != d {
+                    return Err(ProgressError::PercentContradiction {
+                        derived: Some(d),
+                        explicit: exp,
+                    });
+                }
+            } else if new_total == Some(0) {
+                return Err(ProgressError::PercentContradiction {
+                    derived: None,
+                    explicit: exp,
+                });
+            }
+            self.percent = Some(exp);
+        } else if derived.is_some() {
+            self.percent = derived;
+        } else if new_total == Some(0) {
+            self.percent = None;
+        }
+
+        if let Some(cur) = current {
+            self.current = Some(cur);
+            if self.mode == ProgressMode::Activity {
+                self.mode = ProgressMode::Count;
+            }
+        }
+
+        if percent.is_some() && self.current.is_none() && self.total.is_none() {
+            self.mode = ProgressMode::Percent;
+        }
+
+        if let Some(r) = rate {
+            self.rate = Some(r);
+            if self.mode == ProgressMode::Count || self.mode == ProgressMode::Activity {
+                self.mode = ProgressMode::Rate;
+            }
+        }
+
+        if let Some(secs) = elapsed_secs {
+            self.elapsed_secs = Some(secs);
+        }
+
+        if let Some(sub) = subtask {
+            self.subtask = Some(sub);
+        }
+
+        Ok(())
+    }
+
     /// Update current progress count and recompute percentage if total is known.
-    pub fn update_current(&mut self, cur: u64) {
-        self.current = Some(cur);
-        if let Some(tot) = self.total {
-            self.percent = (cur.saturating_mul(100))
-                .checked_div(tot)
-                .map(|p| p.min(100) as u8)
-                .or(Some(100));
-        }
-        if self.mode == ProgressMode::Activity {
-            self.mode = ProgressMode::Count;
-        }
+    pub fn update_current(&mut self, cur: u64) -> Result<(), ProgressError> {
+        self.apply_update(Some(cur), None, None, None, None)
     }
 
     /// Update total count and recompute percentage if current is known.
     pub fn update_total(&mut self, tot: u64) {
         self.total = Some(tot);
         if let Some(cur) = self.current {
-            self.percent = (cur.saturating_mul(100))
-                .checked_div(tot)
-                .map(|p| p.min(100) as u8)
-                .or(Some(100));
+            self.percent = if tot > 0 {
+                (cur.saturating_mul(100))
+                    .checked_div(tot)
+                    .map(|p| p.min(100) as u8)
+            } else {
+                None
+            };
         }
     }
 
     /// Update explicit percentage and set mode to Percent if appropriate.
-    pub fn update_percent(&mut self, pct: u8) {
-        self.percent = Some(pct.min(100));
-        if self.current.is_none() && self.total.is_none() {
-            self.mode = ProgressMode::Percent;
-        }
+    pub fn update_percent(&mut self, pct: u8) -> Result<(), ProgressError> {
+        self.apply_update(None, Some(pct), None, None, None)
     }
 
     /// Update rate and set mode to Rate if units/progress exist.
@@ -189,6 +284,47 @@ impl ProgressState {
         self.elapsed_secs = Some(secs);
     }
 }
+
+/// Progress protocol and semantic validation error.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProgressError {
+    CurrentExceedsTotal { current: u64, total: u64 },
+    PercentContradiction { derived: Option<u8>, explicit: u8 },
+    PercentOutOfRange { percent: u8 },
+}
+
+impl std::fmt::Display for ProgressError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::CurrentExceedsTotal { current, total } => {
+                write!(f, "progress current ({current}) exceeds total ({total})")
+            }
+            Self::PercentContradiction {
+                derived: Some(d),
+                explicit,
+            } => {
+                write!(
+                    f,
+                    "explicit percent ({explicit}%) contradicts derived percent ({d}%)"
+                )
+            }
+            Self::PercentContradiction {
+                derived: None,
+                explicit,
+            } => {
+                write!(
+                    f,
+                    "explicit percent ({explicit}%) supplied when total is zero/unavailable"
+                )
+            }
+            Self::PercentOutOfRange { percent } => {
+                write!(f, "percent ({percent}) exceeds maximum allowed 100%")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ProgressError {}
 
 #[derive(Serialize)]
 struct AgentProgressRepresentation<'a> {
@@ -223,7 +359,7 @@ impl RenderAgent for ProgressState {
             mode: self.mode,
             current: self.current,
             total: self.total,
-            percent: self.percent,
+            percent: self.derived_percent(),
             unit: &self.unit,
             elapsed_secs: self.elapsed_secs,
             rate: &self.rate,

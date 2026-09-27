@@ -203,22 +203,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         ..
                     } => {
                         if let Some(pb) = active_bars.get_mut(&id) {
-                            if let Some(cur) = current {
-                                pb.update_current(cur);
-                            }
-                            if let Some(pct) = percent {
-                                pb.update_percent(pct);
-                            }
-                            if let Some(r) = rate {
-                                pb.update_rate(r);
-                            }
-                            if let Some(secs) = elapsed_secs {
-                                pb.update_elapsed(secs);
-                            }
-                            if let Some(sub) = subtask {
-                                pb.update_subtask(sub);
+                            if let Err(e) =
+                                pb.apply_update(current, percent, rate, elapsed_secs, subtask)
+                            {
+                                eprintln!("sartorial: {e}");
+                                ExitCode::UsageError.exit_process();
                             }
                             pb.update_live(&ctx)?;
+                        } else {
+                            eprintln!("sartorial: progress update for unknown id '{id}'");
+                            ExitCode::UsageError.exit_process();
                         }
                     }
                     ProgressEvent::Finish { id, status, .. } => {

@@ -4,7 +4,7 @@ use crate::render::context::RenderContext;
 use crate::render::human::HumanRenderer;
 use crate::render::plain::PlainRenderer;
 use crate::render::{RenderHuman, RenderPlain};
-use crate::semantic::progress::ProgressState;
+use crate::semantic::progress::{ProgressError, ProgressState};
 use crate::semantic::status::Status;
 use crate::style::ProgressTreatment;
 use std::io::{self, Write};
@@ -98,16 +98,34 @@ impl ProgressBar {
         &mut self.state
     }
 
-    pub fn update_current(&mut self, cur: u64) {
-        self.state.update_current(cur);
+    /// Whether live terminal animation is currently running.
+    pub fn is_animating(&self) -> bool {
+        self.indicatif_bar.is_some()
+    }
+
+    /// Apply an update enforcing single authority and semantic invariants.
+    pub fn apply_update(
+        &mut self,
+        current: Option<u64>,
+        percent: Option<u8>,
+        rate: Option<String>,
+        elapsed_secs: Option<u64>,
+        subtask: Option<String>,
+    ) -> Result<(), ProgressError> {
+        self.state
+            .apply_update(current, percent, rate, elapsed_secs, subtask)
+    }
+
+    pub fn update_current(&mut self, cur: u64) -> Result<(), ProgressError> {
+        self.state.update_current(cur)
     }
 
     pub fn update_total(&mut self, tot: u64) {
         self.state.update_total(tot);
     }
 
-    pub fn update_percent(&mut self, pct: u8) {
-        self.state.update_percent(pct);
+    pub fn update_percent(&mut self, pct: u8) -> Result<(), ProgressError> {
+        self.state.update_percent(pct)
     }
 
     pub fn update_rate(&mut self, rate: impl Into<String>) {
@@ -215,7 +233,7 @@ impl ProgressBar {
             if let (Some(cur), Some(tot)) = (self.state.current, self.state.total) {
                 let unit = self.state.unit.as_deref().unwrap_or("units");
                 msg.push_str(&format!("  {cur} / {tot} {unit}"));
-            } else if let Some(pct) = self.state.percent {
+            } else if let Some(pct) = self.state.derived_percent() {
                 msg.push_str(&format!("  {pct}%"));
             }
             if let Some(ref r) = self.state.rate {
@@ -292,10 +310,10 @@ impl RenderHuman for ProgressBar {
             let count_str = match (self.state.current, self.state.total) {
                 (Some(c), Some(t)) => format!("[{c}/{t}]"),
                 _ => {
-                    if let Some(pct) = self.state.percent {
+                    if let Some(pct) = self.state.derived_percent() {
                         format!("[{pct}%]")
                     } else {
-                        "[--/--]".to_string()
+                        "[-]".to_string()
                     }
                 }
             };
@@ -307,7 +325,7 @@ impl RenderHuman for ProgressBar {
             )?;
 
             if self.state.current.is_some() && self.state.total.is_some() {
-                if let Some(pct) = self.state.percent {
+                if let Some(pct) = self.state.derived_percent() {
                     write!(out, " {pct}%")?;
                 }
             }
@@ -387,7 +405,7 @@ impl RenderHuman for ProgressBar {
 
         // Progress bar for percent mode
         if self.state.mode == ProgressMode::Percent {
-            if let Some(pct) = self.state.percent {
+            if let Some(pct) = self.state.derived_percent() {
                 let bar_width = if ctx.is_narrow() { 10 } else { 18 };
                 let bar = Self::format_bar(pct, bar_width, is_ascii);
                 write!(out, "  ")?;
@@ -436,7 +454,7 @@ impl RenderPlain for ProgressBar {
         if let (Some(cur), Some(tot)) = (self.state.current, self.state.total) {
             write!(out, " ({cur}/{tot})")?;
         }
-        if let Some(pct) = self.state.percent {
+        if let Some(pct) = self.state.derived_percent() {
             write!(out, " {pct}%")?;
         }
         if let Some(secs) = self.state.elapsed_secs {

@@ -19,7 +19,7 @@ pub use fact::Fact;
 pub use notice::{Notice, NoticeLevel};
 pub use outcome::Outcome;
 pub use plan::{ChangeKind, Plan, PlanChange};
-pub use progress::ProgressState;
+pub use progress::{ProgressError, ProgressState};
 pub use receipt::Receipt;
 pub use status::Status;
 pub use table::{ColumnAlignment, TableModel, TableRow};

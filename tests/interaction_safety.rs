@@ -124,3 +124,52 @@ fn test_interactive_off_prevents_live_animation() {
     assert!(!ctx.should_animate(true));
     assert!(!ctx.should_animate(false));
 }
+
+#[test]
+fn test_piped_stdin_does_not_block_progress_animation_on_attended_tty() {
+    // Under default InteractiveMode::Auto:
+    // Prompt interaction requires stdin+stdout TTY (in cargo test, stdin is not a TTY).
+    let cfg = Config::default();
+    let ctx = RenderContext::detect().with_config(cfg.clone());
+
+    // Prompt interaction fails closed if non-interactive without fallback
+    let confirm = Confirm::new("Deploy to production?");
+    let outcome = confirm.prompt_with_config(&cfg).unwrap();
+    assert_eq!(outcome, ConfirmOutcome::NonInteractiveDenied);
+
+    // BUT progress motion eligibility depends on the output stream (attended TTY), NOT stdin!
+    assert!(ctx.should_animate(true)); // Output is attended TTY -> motion eligible
+    assert!(!ctx.should_animate(false)); // Output is redirected -> motion prohibited
+
+    // Deterministic proof: ProgressBar live animation starts when output stream is TTY
+    let mut pb_tty = ProgressBar::count("Compiling crates", 0, 10);
+    pb_tty.start_live_with_tty(&ctx, true).unwrap();
+    assert!(pb_tty.is_animating());
+
+    // And does NOT start when output stream is non-TTY
+    let mut pb_non_tty = ProgressBar::count("Compiling crates", 0, 10);
+    pb_non_tty.start_live_with_tty(&ctx, false).unwrap();
+    assert!(!pb_non_tty.is_animating());
+}
+
+#[test]
+fn test_motion_eligibility_respects_all_authoritative_gates() {
+    // 1. Accessibility reduced motion suppresses animation even on attended TTY
+    let cfg_reduced = Config::new()
+        .with_accessibility(AccessibilityMode::ReducedMotion)
+        .with_motion(MotionMode::Always);
+    let ctx_reduced = RenderContext::detect().with_config(cfg_reduced);
+    assert!(!ctx_reduced.should_animate(true));
+
+    // 2. MotionMode::Never suppresses animation even on attended TTY
+    let cfg_never = Config::new().with_motion(MotionMode::Never);
+    let ctx_never = RenderContext::detect().with_config(cfg_never);
+    assert!(!ctx_never.should_animate(true));
+
+    // 3. RenderTarget::Plain and RenderTarget::Agent suppress animation even on attended TTY
+    let ctx_plain = RenderContext::plain();
+    assert!(!ctx_plain.should_animate(true));
+
+    let ctx_agent = RenderContext::agent();
+    assert!(!ctx_agent.should_animate(true));
+}

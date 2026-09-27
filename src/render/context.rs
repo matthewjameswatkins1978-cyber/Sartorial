@@ -129,20 +129,20 @@ impl RenderContext {
 
     /// Single authority deciding whether motion/progress animation is permitted.
     ///
-    /// Respects:
-    /// - TTY capability (animation NEVER permitted on non-TTY streams)
-    /// - `Config::interactive` (`InteractiveMode::Off` strictly prevents live animation)
-    /// - `Config::motion` (Auto, Always, Never)
-    /// - `AccessibilityMode` (reduced motion suppression)
-    /// - `RenderTarget` (plain text and agent JSON suppression)
+    /// Motion eligibility depends strictly on:
+    /// - Progress output stream being a real attended TTY (`is_tty`)
+    /// - `RenderTarget` being human (suppressed on Agent and Plain targets)
+    /// - `AccessibilityMode` allowing motion (suppressed by reduced motion)
+    /// - `MotionMode` policy
+    /// - `InteractiveMode::Off` acting as an explicit veto
+    ///
+    /// NOTE: Does not require stdin to be a TTY, as progress streaming normally
+    /// arrives via piped stdin to an attended terminal output.
     pub fn should_animate(&self, is_tty: bool) -> bool {
         if !is_tty {
             return false;
         }
         if self.config.interactive == crate::config::InteractiveMode::Off {
-            return false;
-        }
-        if !self.config.is_interactive() {
             return false;
         }
         let reduced_motion = self.config.accessibility.is_reduced_motion();

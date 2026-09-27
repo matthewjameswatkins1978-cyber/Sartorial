@@ -139,6 +139,7 @@ fn default_true() -> bool {
 #[derive(Debug)]
 pub enum ProtocolError {
     UnsupportedVersion { expected: String, actual: String },
+    Progress(crate::semantic::ProgressError),
     Json(serde_json::Error),
     Io(io::Error),
 }
@@ -152,6 +153,7 @@ impl std::fmt::Display for ProtocolError {
                     "unsupported protocol schema_version: got {actual}, expected {expected}"
                 )
             }
+            Self::Progress(e) => write!(f, "protocol progress violation: {e}"),
             Self::Json(e) => write!(f, "Invalid JSON: {e}"),
             Self::Io(e) => write!(f, "I/O error: {e}"),
         }
@@ -161,10 +163,17 @@ impl std::fmt::Display for ProtocolError {
 impl std::error::Error for ProtocolError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::Progress(e) => Some(e),
             Self::Json(e) => Some(e),
             Self::Io(e) => Some(e),
             _ => None,
         }
+    }
+}
+
+impl From<crate::semantic::ProgressError> for ProtocolError {
+    fn from(e: crate::semantic::ProgressError) -> Self {
+        Self::Progress(e)
     }
 }
 

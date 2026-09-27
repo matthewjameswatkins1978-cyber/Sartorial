@@ -75,3 +75,115 @@ fn test_motion_mode_policy() {
     let never = MotionMode::Never;
     assert!(!never.should_animate(true, false, false, false));
 }
+
+#[test]
+fn test_zero_total_semantics_0_0_and_1_0_never_derive_100_percent() {
+    // 0/0 case: completed 0 of 0 items
+    let p0 = ProgressBar::count("Zero total tasks", 0, 0);
+    assert_eq!(p0.state().mode, ProgressMode::Count);
+    assert_eq!(p0.state().current, Some(0));
+    assert_eq!(p0.state().total, Some(0));
+    assert_eq!(p0.state().percent, None); // NEVER Some(100)
+    assert_eq!(p0.state().derived_percent(), None);
+
+    let ctx_plain = RenderContext::plain();
+    let plain0 = p0.to_plain_string(&ctx_plain).unwrap();
+    assert!(plain0.contains("(0/0)"));
+    assert!(!plain0.contains("100%"));
+
+    let cfg_ww = Config::new().with_preset(Preset::Workwear);
+    let ctx_ww = RenderContext::detect().with_config(cfg_ww);
+    let human0 = p0.to_human_string(&ctx_ww).unwrap();
+    assert!(human0.contains("[0/0]"));
+    assert!(!human0.contains("100%"));
+
+    let json0 = p0.state().to_agent_json(false).unwrap();
+    let val0: Value = serde_json::from_str(&json0).unwrap();
+    assert_eq!(val0["current"], 0);
+    assert_eq!(val0["total"], 0);
+    assert!(val0.get("percent").is_none());
+
+    // 1/0 case: completed 1 of 0 items
+    let p1 = ProgressBar::count("Overflow zero tasks", 1, 0);
+    assert_eq!(p1.state().current, Some(1));
+    assert_eq!(p1.state().total, Some(0));
+    assert_eq!(p1.state().percent, None); // NEVER Some(100)
+    assert_eq!(p1.state().derived_percent(), None);
+
+    let plain1 = p1.to_plain_string(&ctx_plain).unwrap();
+    assert!(plain1.contains("(1/0)"));
+    assert!(!plain1.contains("100%"));
+
+    let human1 = p1.to_human_string(&ctx_ww).unwrap();
+    assert!(human1.contains("[1/0]"));
+    assert!(!human1.contains("100%"));
+
+    let json1 = p1.state().to_agent_json(false).unwrap();
+    let val1: Value = serde_json::from_str(&json1).unwrap();
+    assert_eq!(val1["current"], 1);
+    assert_eq!(val1["total"], 0);
+    assert!(val1.get("percent").is_none());
+}
+
+#[test]
+fn test_contradictory_progress_input_enforces_single_authority() {
+    let mut p = ProgressBar::count("Processing batch", 0, 100);
+
+    // 1. Current exceeding total is rejected
+    let res_exceed = p.apply_update(Some(105), None, None, None, None);
+    assert!(matches!(
+        res_exceed,
+        Err(ProgressError::CurrentExceedsTotal {
+            current: 105,
+            total: 100
+        })
+    ));
+
+    // 2. Percent exceeding 100 is rejected
+    let res_pct_range = p.apply_update(Some(50), Some(120), None, None, None);
+    assert!(matches!(
+        res_pct_range,
+        Err(ProgressError::PercentOutOfRange { percent: 120 })
+    ));
+
+    // 3. Contradictory percent (50 / 100 with 12%) is rejected
+    let res_contra = p.apply_update(Some(50), Some(12), None, None, None);
+    assert!(matches!(
+        res_contra,
+        Err(ProgressError::PercentContradiction {
+            derived: Some(50),
+            explicit: 12
+        })
+    ));
+
+    // 4. Agreeing percent (50 / 100 with 50%) is accepted
+    let res_agree = p.apply_update(Some(50), Some(50), None, None, None);
+    assert!(res_agree.is_ok());
+    assert_eq!(p.state().current, Some(50));
+    assert_eq!(p.state().percent, Some(50));
+    assert_eq!(p.state().derived_percent(), Some(50));
+
+    // 5. Subsequent contradictory percent update alone is rejected
+    let res_pct_alone = p.apply_update(None, Some(12), None, None, None);
+    assert!(matches!(
+        res_pct_alone,
+        Err(ProgressError::PercentContradiction {
+            derived: Some(50),
+            explicit: 12
+        })
+    ));
+
+    // 6. Prohibit states such as "50 / 100  12%" in presentation:
+    // Even if a raw state were maliciously crafted, derived_percent is single authority
+    let mut hostile_state = ProgressState::count("Hostile task", 50, 100);
+    hostile_state.percent = Some(12); // forcibly setting raw field
+    assert_eq!(hostile_state.derived_percent(), Some(50)); // single authority overrides!
+
+    let cfg_ww = Config::new().with_preset(Preset::Workwear);
+    let ctx_ww = RenderContext::detect().with_config(cfg_ww);
+    let mut hostile_pb = ProgressBar::count("Hostile task", 50, 100);
+    hostile_pb.state_mut().percent = Some(12);
+    let human_out = hostile_pb.to_human_string(&ctx_ww).unwrap();
+    assert!(human_out.contains("[50/100] 50%"));
+    assert!(!human_out.contains("12%"));
+}

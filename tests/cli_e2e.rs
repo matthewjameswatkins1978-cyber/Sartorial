@@ -571,3 +571,158 @@ fn test_14_missing_schema_version_rejected_with_exit_2() {
         "Error message must mention missing schema_version, got: {stderr}"
     );
 }
+
+#[test]
+fn test_15_stream_rejects_contradictory_percent_with_exit_2() {
+    let stream_data = "\
+{\"type\":\"progress.start\",\"id\":\"scan\",\"activity\":\"Scanning\",\"total\":100}\n\
+{\"type\":\"progress.update\",\"id\":\"scan\",\"current\":50,\"percent\":12}\n";
+
+    let mut child = sartorial_bin()
+        .arg("stream")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(stream_data.as_bytes())
+        .unwrap();
+
+    let output = child.wait_with_output().unwrap();
+    assert_eq!(output.status.code(), Some(ExitCode::UsageError.as_i32()));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("contradicts derived percent"),
+        "Expected error about contradictory percent, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_16_stream_rejects_current_exceeding_total_with_exit_2() {
+    let stream_data = "\
+{\"type\":\"progress.start\",\"id\":\"scan\",\"activity\":\"Scanning\",\"total\":100}\n\
+{\"type\":\"progress.update\",\"id\":\"scan\",\"current\":105}\n";
+
+    let mut child = sartorial_bin()
+        .arg("stream")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(stream_data.as_bytes())
+        .unwrap();
+
+    let output = child.wait_with_output().unwrap();
+    assert_eq!(output.status.code(), Some(ExitCode::UsageError.as_i32()));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("exceeds total"),
+        "Expected error about current exceeding total, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_17_stream_rejects_percent_out_of_range_with_exit_2() {
+    let stream_data = "\
+{\"type\":\"progress.start\",\"id\":\"scan\",\"activity\":\"Scanning\"}\n\
+{\"type\":\"progress.update\",\"id\":\"scan\",\"percent\":150}\n";
+
+    let mut child = sartorial_bin()
+        .arg("stream")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(stream_data.as_bytes())
+        .unwrap();
+
+    let output = child.wait_with_output().unwrap();
+    assert_eq!(output.status.code(), Some(ExitCode::UsageError.as_i32()));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("exceeds maximum allowed 100%"),
+        "Expected error about percent out of range, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_18_stream_zero_total_valid_0_0_succeeds_without_fake_100() {
+    let stream_data = "\
+{\"type\":\"progress.start\",\"id\":\"scan\",\"activity\":\"Checking empty repo\",\"total\":0}\n\
+{\"type\":\"progress.update\",\"id\":\"scan\",\"current\":0}\n\
+{\"type\":\"progress.finish\",\"id\":\"scan\",\"status\":\"ready\"}\n";
+
+    let mut child = sartorial_bin()
+        .arg("stream")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(stream_data.as_bytes())
+        .unwrap();
+
+    let output = child.wait_with_output().unwrap();
+    assert_eq!(output.status.code(), Some(ExitCode::Success.as_i32()));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains("100%"),
+        "Zero total 0/0 must not produce fake 100%, got: {stderr}"
+    );
+    assert!(
+        stderr.contains("Checking empty repo"),
+        "Must contain task name, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_19_stream_zero_total_current_1_rejected_with_exit_2() {
+    let stream_data = "\
+{\"type\":\"progress.start\",\"id\":\"scan\",\"activity\":\"Checking empty repo\",\"total\":0}\n\
+{\"type\":\"progress.update\",\"id\":\"scan\",\"current\":1}\n";
+
+    let mut child = sartorial_bin()
+        .arg("stream")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(stream_data.as_bytes())
+        .unwrap();
+
+    let output = child.wait_with_output().unwrap();
+    assert_eq!(output.status.code(), Some(ExitCode::UsageError.as_i32()));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("exceeds total"),
+        "Expected error about current exceeding total 0, got: {stderr}"
+    );
+}

@@ -62,7 +62,7 @@ pub use render::{
 pub use screens::{DetailScreen, ListScreen, SummaryScreen};
 pub use semantic::{
     Action, ChangeKind, ChoiceItem, ErrorModel, Evidence, Fact, Notice, NoticeLevel, Outcome, Plan,
-    PlanChange, ProgressState, Receipt, Status, TableModel, TableRow,
+    PlanChange, ProgressError, ProgressState, Receipt, Status, TableModel, TableRow,
 };
 pub use style::{Preset, ProgressTreatment, ResolvedStyle};
 pub use typo::TypoSuggestion;
