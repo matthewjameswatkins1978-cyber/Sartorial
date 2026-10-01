@@ -1,3 +1,4 @@
+#![cfg(feature = "wire")]
 use sartorial::components::error::ErrorView;
 use sartorial::components::table::TableView;
 use sartorial::protocol::{

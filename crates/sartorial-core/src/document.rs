@@ -2,6 +2,7 @@ use crate::semantic::{
     Action, ChoiceItem, ErrorModel, Evidence, Fact, Notice, Outcome, Plan, ProgressState, Receipt,
     Status, TableModel,
 };
+use serde::{Deserialize, Serialize};
 
 /// Central presentation representation.
 ///
@@ -10,7 +11,7 @@ use crate::semantic::{
 /// Markdown renderers only decide spacing, wrapping, glyphs, and emphasis.
 /// A renderer never decides whether something succeeded, what evidence
 /// means, or what changed.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Document {
     pub blocks: Vec<Block>,
 }
@@ -43,7 +44,7 @@ impl Document {
 
 /// One resolved presentation unit. All application meaning is already
 /// decided; only visual treatment is left to the renderer.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Block {
     Title {
         text: String,

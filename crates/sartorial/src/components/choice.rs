@@ -1,4 +1,3 @@
-#[cfg(feature = "interactive")]
 use crate::config::Config;
 #[cfg(feature = "interactive")]
 use crate::interaction::TerminalGuard;
@@ -96,28 +95,33 @@ impl Choice {
     }
 
     /// Execute selection using default configuration.
-    #[cfg(feature = "interactive")]
+    /// Without the `interactive` feature this always resolves
+    /// non-interactively (fallback or fail-closed).
     pub fn select(&mut self) -> io::Result<ChoiceOutcome<'_>> {
-        self.select_with_config(&Config::default())
+        #[cfg(feature = "interactive")]
+        return self.select_with_config(&Config::default());
+        #[cfg(not(feature = "interactive"))]
+        return Ok(self.resolve_non_interactive());
     }
 
     /// Execute selection using the single authority of the provided configuration.
-    #[cfg(feature = "interactive")]
     pub fn select_with_config(&mut self, config: &Config) -> io::Result<ChoiceOutcome<'_>> {
         if self.items.is_empty() {
             return Ok(ChoiceOutcome::Cancelled);
         }
-
-        // Single authority for interactivity: fail-closed if non-interactive and no fallback
         if !config.is_interactive() {
-            return match self.non_interactive_fallback {
-                Some(idx) if idx < self.items.len() => {
-                    Ok(ChoiceOutcome::NonInteractiveFallback(&self.items[idx]))
-                }
-                _ => Ok(ChoiceOutcome::NonInteractiveDenied),
-            };
+            return Ok(self.resolve_non_interactive());
         }
+        #[cfg(not(feature = "interactive"))]
+        #[allow(unreachable_code)]
+        return Ok(self.resolve_non_interactive());
+        #[cfg(feature = "interactive")]
+        return self.select_live(config);
+    }
 
+    /// Live keyboard selection (requires the `interactive` feature).
+    #[cfg(feature = "interactive")]
+    fn select_live(&mut self, config: &Config) -> io::Result<ChoiceOutcome<'_>> {
         let ctx = RenderContext::detect().with_config(config.clone());
         let _guard = TerminalGuard::enter()?;
         let mut out = stdout();

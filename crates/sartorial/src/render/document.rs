@@ -56,3 +56,23 @@ converge!(
 // `Plan` and `Receipt` converge through the same path; their compatibility
 // impls live beside the component shims (`components::plan`,
 // `components::receipt`) to keep one reviewable owner per type.
+
+/// Small serialized presentation wire format (requires the `wire` feature).
+///
+/// This is presentation wire format, never an application business schema:
+/// applications keep their own machine schemas and use Sartorial only to
+/// present them.
+#[cfg(feature = "wire")]
+pub fn document_to_json(doc: &Document, pretty: bool) -> Result<String, serde_json::Error> {
+    if pretty {
+        serde_json::to_string_pretty(doc)
+    } else {
+        serde_json::to_string(doc)
+    }
+}
+
+/// Deserialize a presentation document produced by [`document_to_json`].
+#[cfg(feature = "wire")]
+pub fn document_from_json(s: &str) -> Result<Document, serde_json::Error> {
+    serde_json::from_str(s)
+}

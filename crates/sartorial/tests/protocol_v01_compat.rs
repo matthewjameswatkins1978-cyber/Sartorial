@@ -1,3 +1,4 @@
+#![cfg(feature = "wire")]
 //! sartorial.v0.1 protocol compatibility: the visual/framework release
 //! must not expand the versioned wire Action vocabulary.
 //!

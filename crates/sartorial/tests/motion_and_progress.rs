@@ -1,4 +1,5 @@
 use sartorial::*;
+#[cfg(feature = "wire")]
 use serde_json::Value;
 
 #[test]
@@ -12,11 +13,14 @@ fn test_unknown_total_never_fabricates_percentage() {
     assert_eq!(p.state().total, None);
     assert_eq!(p.state().elapsed_secs, Some(14));
 
-    let json_str = p.state().to_agent_json(false).unwrap();
-    let val: Value = serde_json::from_str(&json_str).unwrap();
-    assert_eq!(val["mode"], "activity");
-    assert!(val.get("percent").is_none());
-    assert_eq!(val["elapsed_secs"], 14);
+    #[cfg(feature = "wire")]
+    {
+        let json_str = p.state().to_agent_json(false).unwrap();
+        let val: Value = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(val["mode"], "activity");
+        assert!(val.get("percent").is_none());
+        assert_eq!(val["elapsed_secs"], 14);
+    }
 }
 
 #[test]
@@ -49,6 +53,7 @@ fn test_countdown_reflects_supplied_time() {
 }
 
 #[test]
+#[cfg(feature = "wire")]
 fn test_no_spinner_frames_in_json() {
     let p = ProgressBar::activity("Checking repository").with_elapsed(22);
     let json_str = p.state().to_agent_json(true).unwrap();
@@ -99,11 +104,14 @@ fn test_zero_total_semantics_0_0_and_1_0_never_derive_100_percent() {
     assert!(human0.contains("ZERO TOTAL TASKS"));
     assert!(!human0.contains("100%"));
 
-    let json0 = p0.state().to_agent_json(false).unwrap();
-    let val0: Value = serde_json::from_str(&json0).unwrap();
-    assert_eq!(val0["current"], 0);
-    assert_eq!(val0["total"], 0);
-    assert!(val0.get("percent").is_none());
+    #[cfg(feature = "wire")]
+    {
+        let json0 = p0.state().to_agent_json(false).unwrap();
+        let val0: Value = serde_json::from_str(&json0).unwrap();
+        assert_eq!(val0["current"], 0);
+        assert_eq!(val0["total"], 0);
+        assert!(val0.get("percent").is_none());
+    }
 
     assert!(matches!(
         ProgressBar::count("Overflow zero tasks", 1, 0),
@@ -229,6 +237,7 @@ fn test_invalid_mutated_native_state_cannot_render_or_serialize_as_valid() {
             .kind(),
         std::io::ErrorKind::InvalidInput
     );
+    #[cfg(feature = "wire")]
     assert!(bar.state().to_agent_json(false).is_err());
 
     let mut total_update = ProgressState::count("scan", 4, 5).unwrap();

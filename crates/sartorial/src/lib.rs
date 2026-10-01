@@ -73,12 +73,12 @@ pub use pager::PagerMode;
 #[cfg(feature = "wire")]
 pub use protocol::{ProgressEvent, ProtocolEnvelope};
 pub use provenance::{ProvenanceFact, ProvenanceList, ProvenanceSource};
-pub use render::{
-    AgentRenderer, MarkdownRenderer, PlainRenderer, RenderContext, RenderHuman, RenderMarkdown,
-    RenderPlain, RenderTarget, TerminalRenderer, WidthCategory,
-};
 #[cfg(feature = "wire")]
-pub use render::{RenderAgent, SARTORIAL_SCHEMA_VERSION};
+pub use render::{AgentRenderer, RenderAgent, SARTORIAL_SCHEMA_VERSION};
+pub use render::{
+    MarkdownRenderer, PlainRenderer, RenderContext, RenderHuman, RenderMarkdown, RenderPlain,
+    RenderTarget, TerminalRenderer, WidthCategory,
+};
 pub use screens::{DetailScreen, ListScreen, SummaryScreen};
 pub use style::{ProgressTreatment, SectionRule, StatusLayout, TitleCase};
 pub use typo::TypoSuggestion;

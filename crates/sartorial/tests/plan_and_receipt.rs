@@ -1,4 +1,5 @@
 use sartorial::*;
+#[cfg(feature = "wire")]
 use serde_json::Value;
 
 #[test]
@@ -25,21 +26,24 @@ fn test_plan_presentation_and_agent_json() {
     assert!(plain.contains("[A] Apply"));
     assert!(plain.contains("[Q] Cancel"));
 
-    // Agent JSON test
-    let json_str = plan.to_agent_json(true).unwrap();
-    assert!(!json_str.contains("\x1b"));
+    // Agent JSON test (wire surface)
+    #[cfg(feature = "wire")]
+    {
+        let json_str = plan.to_agent_json(true).unwrap();
+        assert!(!json_str.contains("\x1b"));
 
-    let val: Value = serde_json::from_str(&json_str).unwrap();
-    assert_eq!(val["schema_version"], "sartorial.v0.1");
-    assert_eq!(val["title"], "PATH REPAIR");
-    assert_eq!(val["changes"].as_array().unwrap().len(), 2);
-    assert_eq!(val["changes"][0]["kind"], "add");
-    assert_eq!(
-        val["changes"][0]["target"],
-        "C:\\Users\\Matmus\\.cargo\\bin"
-    );
-    assert_eq!(val["changes"][1]["kind"], "modify");
-    assert_eq!(val["next_actions"], serde_json::json!(["apply", "quit"]));
+        let val: Value = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(val["schema_version"], "sartorial.v0.1");
+        assert_eq!(val["title"], "PATH REPAIR");
+        assert_eq!(val["changes"].as_array().unwrap().len(), 2);
+        assert_eq!(val["changes"][0]["kind"], "add");
+        assert_eq!(
+            val["changes"][0]["target"],
+            "C:\\Users\\Matmus\\.cargo\\bin"
+        );
+        assert_eq!(val["changes"][1]["kind"], "modify");
+        assert_eq!(val["next_actions"], serde_json::json!(["apply", "quit"]));
+    }
 }
 
 #[test]
@@ -64,15 +68,18 @@ fn test_receipt_presentation_and_agent_json() {
     assert!(plain.contains("receipt-ref-1082"));
     assert!(plain.contains("[Enter] Open shell"));
 
-    let json_str = receipt.to_agent_json(true).unwrap();
-    assert!(!json_str.contains("\x1b"));
+    #[cfg(feature = "wire")]
+    {
+        let json_str = receipt.to_agent_json(true).unwrap();
+        assert!(!json_str.contains("\x1b"));
 
-    let val: Value = serde_json::from_str(&json_str).unwrap();
-    assert_eq!(val["schema_version"], "sartorial.v0.1");
-    assert_eq!(val["title"], "PATH UPDATED");
-    assert_eq!(val["status"], "ready");
-    assert_eq!(val["changes"].as_array().unwrap().len(), 2);
-    assert_eq!(val["unchanged"].as_array().unwrap().len(), 1);
-    assert_eq!(val["evidence_handle"], "receipt-ref-1082");
-    assert_eq!(val["next_actions"], serde_json::json!(["open", "quit"]));
+        let val: Value = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(val["schema_version"], "sartorial.v0.1");
+        assert_eq!(val["title"], "PATH UPDATED");
+        assert_eq!(val["status"], "ready");
+        assert_eq!(val["changes"].as_array().unwrap().len(), 2);
+        assert_eq!(val["unchanged"].as_array().unwrap().len(), 1);
+        assert_eq!(val["evidence_handle"], "receipt-ref-1082");
+        assert_eq!(val["next_actions"], serde_json::json!(["open", "quit"]));
+    }
 }

@@ -43,16 +43,20 @@ fn test_same_semantic_truth_across_three_targets() {
     assert!(plain_str.contains("Windows 11"));
     assert!(plain_str.contains("[Enter] Open"));
 
-    // 3. Agent JSON view
-    let json_str = outcome.to_agent_json(true).expect("valid JSON");
-    assert!(!json_str.contains("\x1b["));
+    // 3. Agent JSON view (wire surface)
+    #[cfg(feature = "wire")]
+    {
+        let json_str = outcome.to_agent_json(true).expect("valid JSON");
+        assert!(!json_str.contains("\x1b["));
 
-    let val: serde_json::Value = serde_json::from_str(&json_str).expect("deserialize Outcome JSON");
-    assert_eq!(val["schema_version"], "sartorial.v0.1");
-    assert_eq!(val["status"], "ready");
-    assert_eq!(val["title"], "Environment Check");
-    assert_eq!(val["facts"].as_array().unwrap().len(), 2);
-    assert_eq!(val["next_actions"], serde_json::json!(["open", "quit"]));
+        let val: serde_json::Value =
+            serde_json::from_str(&json_str).expect("deserialize Outcome JSON");
+        assert_eq!(val["schema_version"], "sartorial.v0.1");
+        assert_eq!(val["status"], "ready");
+        assert_eq!(val["title"], "Environment Check");
+        assert_eq!(val["facts"].as_array().unwrap().len(), 2);
+        assert_eq!(val["next_actions"], serde_json::json!(["open", "quit"]));
+    }
 }
 
 #[test]

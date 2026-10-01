@@ -28,6 +28,7 @@ pub struct ProgressBar {
     #[cfg(feature = "progress")]
     indicatif_bar: Option<indicatif::ProgressBar>,
     #[cfg(not(feature = "progress"))]
+    #[allow(dead_code)]
     indicatif_bar: Option<NoLiveBar>,
     /// Last static line flushed to stderr (Minimal/Numeric treatments).
     last_static_line: Option<String>,

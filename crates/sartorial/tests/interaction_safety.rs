@@ -89,6 +89,7 @@ fn test_choice_non_interactive_explicit_fallback() {
 }
 
 #[test]
+#[cfg(feature = "interactive")]
 fn test_terminal_guard_restoration_lifecycle() {
     // Test that TerminalGuard enters and drops cleanly without panicking
     {
@@ -108,9 +109,12 @@ fn test_convenience_helpers_return_io_results() {
     let plain_str = plain_res.unwrap();
     assert!(plain_str.contains("TEST"));
 
-    // to_agent_json returns Result<String, serde_json::Error>
-    let json_res = to_agent_json(&outcome);
-    assert!(json_res.is_ok());
+    // to_agent_json returns Result<String, serde_json::Error> (wire surface)
+    #[cfg(feature = "wire")]
+    {
+        let json_res = to_agent_json(&outcome);
+        assert!(json_res.is_ok());
+    }
 }
 
 #[test]
@@ -133,18 +137,25 @@ fn test_piped_stdin_does_not_block_progress_animation_on_attended_tty() {
     let ctx = RenderContext::detect().with_config(cfg.clone());
 
     // Prompt interaction fails closed if non-interactive without fallback
-    let confirm = Confirm::new("Deploy to production?");
-    let outcome = confirm.prompt_with_config(&cfg).unwrap();
-    assert_eq!(outcome, ConfirmOutcome::NonInteractiveDenied);
+    #[cfg(feature = "interactive")]
+    {
+        let confirm = Confirm::new("Deploy to production?");
+        let outcome = confirm.prompt_with_config(&cfg).unwrap();
+        assert_eq!(outcome, ConfirmOutcome::NonInteractiveDenied);
+    }
 
     // BUT progress motion eligibility depends on the output stream (attended TTY), NOT stdin!
     assert!(ctx.should_animate(true)); // Output is attended TTY -> motion eligible
     assert!(!ctx.should_animate(false)); // Output is redirected -> motion prohibited
 
     // Deterministic proof: ProgressBar live animation starts when output stream is TTY
+    // (requires the live `progress` machinery; otherwise it stays static).
     let mut pb_tty = ProgressBar::count("Compiling crates", 0, 10).unwrap();
     pb_tty.start_live_with_tty(&ctx, true).unwrap();
+    #[cfg(feature = "progress")]
     assert!(pb_tty.is_animating());
+    #[cfg(not(feature = "progress"))]
+    assert!(!pb_tty.is_animating());
 
     // And does NOT start when output stream is non-TTY
     let mut pb_non_tty = ProgressBar::count("Compiling crates", 0, 10).unwrap();

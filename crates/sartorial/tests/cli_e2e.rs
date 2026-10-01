@@ -1,3 +1,4 @@
+#![cfg(all(feature = "clap", feature = "wire"))]
 use sartorial::exit::ExitCode;
 use sartorial::protocol::{ChoiceResult, ConfirmResult};
 use std::io::Write;

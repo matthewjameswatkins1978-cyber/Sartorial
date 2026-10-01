@@ -162,6 +162,7 @@ fn all_four_silhouettes_differ_without_colour() {
 }
 
 #[test]
+#[cfg(feature = "wire")]
 fn agent_json_identical_across_presets() {
     let mut jsons = Vec::new();
     for preset in [
@@ -273,9 +274,15 @@ fn real_actions_keep_key_brackets() {
         bar.to_human_string(&ctx).unwrap().contains("[R] Retry"),
         "real actions keep their brackets"
     );
-    let screen =
-        SummaryScreen::new("Demo", Status::Ready).action(Action::new('d', "next", "Do the thing"));
-    assert!(screen.to_agent_json(false).unwrap().contains("\"next\""));
+    #[cfg(feature = "wire")]
+    {
+        let screen = SummaryScreen::new("Demo", Status::Ready).action(Action::new(
+            'd',
+            "next",
+            "Do the thing",
+        ));
+        assert!(screen.to_agent_json(false).unwrap().contains("\"next\""));
+    }
 }
 
 #[test]

@@ -1,4 +1,3 @@
-#[cfg(feature = "interactive")]
 use crate::config::Config;
 #[cfg(feature = "interactive")]
 use crate::interaction::{read_key, TerminalGuard};
@@ -72,21 +71,30 @@ impl Confirm {
     }
 
     /// Run confirmation using default configuration.
-    #[cfg(feature = "interactive")]
+    /// Without the `interactive` feature this always resolves
+    /// non-interactively (fallback or fail-closed).
     pub fn prompt(&self) -> io::Result<ConfirmOutcome> {
-        self.prompt_with_config(&Config::default())
+        #[cfg(feature = "interactive")]
+        return self.prompt_with_config(&Config::default());
+        #[cfg(not(feature = "interactive"))]
+        return Ok(self.resolve_non_interactive());
     }
 
     /// Run confirmation using the single authority of the provided configuration.
-    #[cfg(feature = "interactive")]
     pub fn prompt_with_config(&self, config: &Config) -> io::Result<ConfirmOutcome> {
         if !config.is_interactive() {
-            return match self.non_interactive_fallback {
-                Some(fb) => Ok(ConfirmOutcome::NonInteractiveFallback(fb)),
-                None => Ok(ConfirmOutcome::NonInteractiveDenied),
-            };
+            return Ok(self.resolve_non_interactive());
         }
+        #[cfg(not(feature = "interactive"))]
+        #[allow(unreachable_code)]
+        return Ok(self.resolve_non_interactive());
+        #[cfg(feature = "interactive")]
+        return self.prompt_live(config);
+    }
 
+    /// Live keyboard prompting (requires the `interactive` feature).
+    #[cfg(feature = "interactive")]
+    fn prompt_live(&self, config: &Config) -> io::Result<ConfirmOutcome> {
         let ctx = RenderContext::detect().with_config(config.clone());
         self.render_human(&ctx, &mut stdout())?;
         stdout().flush()?;

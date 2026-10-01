@@ -1,3 +1,4 @@
+#![cfg(feature = "wire")]
 use sartorial::render::SARTORIAL_SCHEMA_VERSION;
 use sartorial::*;
 use serde_json::Value;
