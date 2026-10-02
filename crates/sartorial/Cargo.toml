@@ -3,13 +3,15 @@ name = "sartorial"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
-description = "Batteries-included terminal presentation toolkit: sartorial-core plus capability detection, live progress, interaction, Clap integration, and optional wire protocol."
+description = "An opinionated Rust CLI presentation toolkit for humans and agents, built on sartorial-core."
 readme = "README.md"
 repository.workspace = true
 license.workspace = true
+keywords = ["cli", "terminal", "presentation", "ansi"]
+categories = ["command-line-interface", "development-tools::cli"]
 
 [dependencies]
-sartorial-core = { version = "0.3.0", path = "../sartorial-core" }
+sartorial-core = { version = "0.5.0", path = "../sartorial-core" }
 anstyle.workspace = true
 anstream.workspace = true
 unicode-width.workspace = true
