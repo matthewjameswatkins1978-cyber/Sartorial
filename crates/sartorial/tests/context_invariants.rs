@@ -87,32 +87,16 @@ fn explicit_constructor_uses_a_synthetic_capability_snapshot() {
 
 #[test]
 fn hyperlink_formatting_can_consume_resolved_capability() {
-    let linked = Hyperlink::format_resolved(
-        "docs",
-        "https://example.test",
-        true,
-        false,
-        true,
-    );
+    let linked = Hyperlink::format_resolved("docs", "https://example.test", true, false, true);
     assert!(linked.contains("\x1b]8;;https://example.test"));
 
-    let fallback = Hyperlink::format_resolved(
-        "docs",
-        "https://example.test",
-        true,
-        false,
-        false,
-    );
+    let fallback = Hyperlink::format_resolved("docs", "https://example.test", true, false, false);
     assert_eq!(fallback, "docs (https://example.test)");
 }
 
 #[test]
 fn generic_agent_result_path_fails_closed() {
-    let ctx = RenderContext::from_config_with_tty(
-        Config::default(),
-        true,
-        RenderTarget::Agent,
-    );
+    let ctx = RenderContext::from_config_with_tty(Config::default(), true, RenderTarget::Agent);
     let outcome = Outcome::new(Status::Ready, "Machine result");
 
     let err = SartorialOutput::print_result(&outcome, &ctx).unwrap_err();
