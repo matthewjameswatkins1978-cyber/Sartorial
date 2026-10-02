@@ -54,17 +54,25 @@ coherent while keeping each tool's decisions and contracts in its own hands.
 | Deterministic semantic model, `Document`, styles, terminal/plain/Markdown rendering | `sartorial-core` |
 | Capability detection, channels, live progress, prompts, Clap, completions, optional wire protocol | `sartorial` (re-exports core) |
 
-Until the first crates.io publication, depend on the Git repository:
+Install the published crates from crates.io:
+
+```toml
+[dependencies]
+sartorial = "0.5"
+# or, for the deterministic engine only:
+sartorial-core = "0.5"
+```
+
+To track unreleased work on `main` instead, use the Git repository explicitly:
 
 ```toml
 [dependencies]
 sartorial = { git = "https://github.com/matthewjameswatkins1978-cyber/Sartorial" }
-# or, for the deterministic engine only:
+# or
 sartorial-core = { git = "https://github.com/matthewjameswatkins1978-cyber/Sartorial" }
 ```
 
-The workspace version is `0.5.0`; crates.io coordinates will become the preferred
-installation form once that version is actually published.
+The current released workspace version is `0.5.0`.
 
 ## Preset and Theme
 
