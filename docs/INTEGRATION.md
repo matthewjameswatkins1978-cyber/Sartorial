@@ -13,7 +13,16 @@ For the crate split and data flow, see [Architecture](ARCHITECTURE.md).
 | Deterministic semantic types, one `Document`, terminal/plain/Markdown renderers | `sartorial-core` |
 | Detection, channel helpers, live progress, prompts, Clap, completions, optional wire | `sartorial` |
 
-Until the first crates.io publication, use the Git repository:
+Use the published crates from crates.io:
+
+```toml
+[dependencies]
+sartorial = "0.5"
+# or
+sartorial-core = "0.5"
+```
+
+To track unreleased work on `main`, use the Git repository explicitly:
 
 ```toml
 [dependencies]
@@ -22,8 +31,7 @@ sartorial = { git = "https://github.com/matthewjameswatkins1978-cyber/Sartorial"
 sartorial-core = { git = "https://github.com/matthewjameswatkins1978-cyber/Sartorial" }
 ```
 
-The workspace version is `0.5.0`; switch to crates.io coordinates after that
-version is actually published.
+The current released workspace version is `0.5.0`.
 
 ## Choose a presentation type
 
