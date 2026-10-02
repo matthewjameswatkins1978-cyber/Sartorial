@@ -4,7 +4,9 @@
 
 #![cfg(feature = "wire")]
 
-use sartorial::render::document::{document_from_json, document_to_json};
+use sartorial::render::document::{
+    document_from_json, document_to_json, DOCUMENT_SCHEMA_VERSION,
+};
 use sartorial::*;
 
 /// An application-owned machine schema. It never becomes a Sartorial
@@ -46,6 +48,9 @@ fn document_wire_format_round_trips() {
     let doc = screen.to_document();
     let json = document_to_json(&doc, false).unwrap();
     assert!(!json.contains('\x1b'));
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(value["schema"], DOCUMENT_SCHEMA_VERSION);
+    assert!(value.get("document").is_some());
     let back = document_from_json(&json).unwrap();
     assert_eq!(doc, back);
 
@@ -69,4 +74,16 @@ fn agent_json_carries_no_presentation_noise() {
     let val: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(val["status"], "failed");
     assert_eq!(val["schema_version"], "sartorial.v0.1");
+}
+
+
+#[test]
+fn document_wire_rejects_unknown_schema_versions() {
+    let doc = SummaryScreen::new("Mutation campaign", Status::Ready).to_document();
+    let json = document_to_json(&doc, false).unwrap();
+    let mut value: serde_json::Value = serde_json::from_str(&json).unwrap();
+    value["schema"] = serde_json::Value::String("sartorial.document.v999".to_string());
+    let bad = serde_json::to_string(&value).unwrap();
+    let err = document_from_json(&bad).unwrap_err();
+    assert!(err.to_string().contains("unsupported Sartorial Document schema"));
 }
