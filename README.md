@@ -63,7 +63,7 @@ sartorial = { git = "https://github.com/matthewjameswatkins1978-cyber/Sartorial"
 sartorial-core = { git = "https://github.com/matthewjameswatkins1978-cyber/Sartorial" }
 ```
 
-The workspace version is `0.3.0`; crates.io coordinates will become the preferred
+The workspace version is `0.5.0`; crates.io coordinates will become the preferred
 installation form once that version is actually published.
 
 ## Preset and Theme
@@ -237,6 +237,29 @@ The application keeps ownership of its state, business rules, and JSON
 schema. Sartorial makes the same result pleasant to use across destinations.
 
 ## One Document, three static renderers
+
+All presentation converges through one structure:
+
+```text
+same semantic truth
+        │
+        ▼
+     Document
+        │
+ ┌──────┼──────┐
+ ▼      ▼      ▼
+Terminal Plain Markdown
+```
+
+Beneath the Terminal renderer, the four grammars compose with any theme:
+
+```text
+Terminal
+    │
+House / Black Tie / Workwear / Studio
+             +
+          Theme
+```
 
 Use the semantic types that fit the result—such as `SummaryScreen`, `Plan`,
 `Receipt`, `ErrorModel`, or `TableModel`—and turn a presentable value into its

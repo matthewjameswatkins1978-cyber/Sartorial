@@ -1,4 +1,4 @@
-# Sartorial v0.3 architecture
+# Sartorial v0.5 architecture
 
 Sartorial separates application meaning from command-line presentation. The
 application remains the authority for its state, decisions, business schemas,

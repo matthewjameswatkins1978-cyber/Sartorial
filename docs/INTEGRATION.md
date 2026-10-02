@@ -22,7 +22,7 @@ sartorial = { git = "https://github.com/matthewjameswatkins1978-cyber/Sartorial"
 sartorial-core = { git = "https://github.com/matthewjameswatkins1978-cyber/Sartorial" }
 ```
 
-The workspace version is `0.3.0`; switch to crates.io coordinates after that
+The workspace version is `0.5.0`; switch to crates.io coordinates after that
 version is actually published.
 
 ## Choose a presentation type
