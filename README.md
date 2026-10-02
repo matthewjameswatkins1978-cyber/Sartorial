@@ -93,6 +93,149 @@ The four built-in presets are **House** (quiet and restrained), **Black Tie**
 and **Studio** (roomier and presentation-friendly). An explicit theme survives
 preset changes; a preset never changes the facts being rendered.
 
+## See it on a new CLI
+
+Imagine a `harbour` command that has checked a repository and knows these
+facts: `biscuit-logic/harbour`, branch `main`, 1,284 files checked, three
+warnings, and a ready result. One `SummaryScreen` carries that result; only
+the presentation target and preset vary:
+
+```rust
+use sartorial::{Notice, Status, SummaryScreen};
+
+let result = SummaryScreen::new("HARBOUR", Status::Ready)
+    .fact("Repository", "biscuit-logic/harbour")
+    .fact("Branch", "main")
+    .fact("Files", "1,284")
+    .fact("Warnings", "3")
+    .notice(Notice::warning("3 items may need attention."));
+```
+
+These captures use the same result at 80 columns, with terminal colour
+disabled to keep the examples readable.
+
+### House
+
+Quiet and balanced:
+
+```text
+HARBOUR
+
+Status        ✓ READY
+
+Repository  biscuit-logic/harbour
+Branch      main
+Files       1,284
+Warnings    3
+
+! 3 items may need attention.
+```
+
+### Workwear
+
+Denser and more operational:
+
+```text
+» HARBOUR
+» STATUS  ✓ READY
+REPOSITORY: biscuit-logic/harbour
+BRANCH:     main
+FILES:      1,284
+WARNINGS:   3
+! 3 items may need attention.
+```
+
+### Studio
+
+More breathing room for reports and demonstrations:
+
+```text
+HARBOUR
+
+
+Status
+──────
+✓ READY
+
+
+Repository      biscuit-logic/harbour
+Branch          main
+Files           1,284
+Warnings        3
+
+
+! 3 items may need attention.
+```
+
+The product can add its own `Theme` without defining another layout system:
+
+```rust
+use anstyle::AnsiColor;
+use sartorial::{Config, Preset, Theme};
+
+let theme = Theme::builder("Harbour")
+    .accent(AnsiColor::Cyan)
+    .success(AnsiColor::Green)
+    .warning(AnsiColor::Yellow)
+    .build();
+
+let config = Config::new()
+    .with_preset(Preset::Workwear)
+    .with_theme(theme);
+```
+
+The preset controls how information is arranged and treated. The theme gives
+it the application's visual identity.
+
+### Plain
+
+Select the Plain target for pipe-safe text without ANSI styling:
+
+```text
+HARBOUR
+
+Status        [OK] READY
+
+Repository  biscuit-logic/harbour
+Branch      main
+Files       1,284
+Warnings    3
+
+[!] 3 items may need attention.
+```
+
+When a CLI selects Plain output for redirection, it can feed ordinary tools:
+
+```sh
+harbour check > report.txt
+harbour check | grep Warnings
+```
+
+### Markdown
+
+The same result can become a GitHub-ready report or handoff:
+
+```markdown
+# HARBOUR
+
+## STATUS
+
+**Status:** ✓ READY
+
+| Name | Value |
+| --- | --- |
+| Repository | biscuit-logic/harbour |
+| Branch | main |
+| Files | 1,284 |
+| Warnings | 3 |
+
+> [!WARNING]
+> 3 items may need attention.
+```
+
+The application keeps ownership of its state, business rules, and JSON
+schema. Sartorial makes the same result pleasant to use across destinations.
+
 ## One Document, three static renderers
 
 Use the semantic types that fit the result—such as `SummaryScreen`, `Plan`,
