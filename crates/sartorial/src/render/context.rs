@@ -77,11 +77,7 @@ impl RenderContext {
     /// animates, and vice versa.
     pub fn detect() -> Self {
         let environment = EnvironmentSnapshot::detect();
-        Self::from_config_with_environment(
-            Config::default(),
-            RenderTarget::Human,
-            environment,
-        )
+        Self::from_config_with_environment(Config::default(), RenderTarget::Human, environment)
     }
 
     /// Build a context from explicit configuration and TTY state.
@@ -101,10 +97,8 @@ impl RenderContext {
         environment: EnvironmentSnapshot,
     ) -> Self {
         let width = config.width.unwrap_or(environment.width);
-        let mut style = config.resolve_style_with_environment(
-            environment.stdout_is_tty,
-            environment.no_color_env,
-        );
+        let mut style = config
+            .resolve_style_with_environment(environment.stdout_is_tty, environment.no_color_env);
         let symbols = style.symbols;
         let unicode = symbols == SymbolMode::Unicode;
         let static_target = target.is_plain() || target.is_agent() || target.is_markdown();
@@ -252,10 +246,7 @@ impl RenderContext {
 
     /// Single authority deciding whether motion/progress animation is permitted.
     pub fn should_animate(&self, is_tty: bool) -> bool {
-        if !is_tty
-            || self.target.is_plain()
-            || self.target.is_agent()
-            || self.target.is_markdown()
+        if !is_tty || self.target.is_plain() || self.target.is_agent() || self.target.is_markdown()
         {
             return false;
         }
