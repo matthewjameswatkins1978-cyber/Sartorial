@@ -1,143 +1,125 @@
-# Sartorial
+<p align="center">
+  <img src="assets/sartorial-mark.svg" alt="Sartorial mark" width="112" height="112">
+</p>
 
-**An opinionated Rust presentation framework for command-line applications.**<br>
-*Embodying the Biscuit Logic CLI Presentation Standard (BL-CLI-01).*
+<h1 align="center">Sartorial</h1>
 
-Your program knows what happened. Sartorial knows how to present it.
+<p align="center"><strong>One meaning. A considered way to present it.</strong><br>
+An opinionated Rust presentation toolkit for command-line applications.</p>
 
-```
-                     APPLICATION
-                         │
-                    semantic truth
-                         │
-                         ▼
-                ┌─────────────────┐
-                │ sartorial-core  │
-                │                 │
-                │ Document        │
-                │ Preset          │
-                │ Theme           │
-                │ Capabilities    │
-                │ Rendering       │
-                └───────┬─────────┘
-                        │
-           ┌────────────┼────────────┐
-           ▼            ▼            ▼
-        TERMINAL       PLAIN       MARKDOWN
+Your application knows what happened. Sartorial decides how to show it.
+That boundary keeps presentation consistent without taking ownership of your
+state, business rules, or machine-readable contract.
 
-
-                ┌─────────────────┐
-                │    sartorial    │
-                │                 │
-                │ detection       │
-                │ progress        │
-                │ interaction     │
-                │ clap            │
-                │ completions     │
-                │ optional wire   │
-                │ diagnostics     │
-                └─────────────────┘
+```text
+Application truth  →  semantic model  →  one Document  →  Terminal / Plain / Markdown
+       │                     │                 │
+       └── owns state        └── Sartorial     └── same meaning, different presentation
 ```
 
----
+## What sets Sartorial apart
 
-## Which crate?
+- **One meaning, several views.** Semantic values become a `Document` once.
+  Terminal, plain text, and Markdown renderers format that shared structure;
+  they do not decide whether an operation succeeded or reinterpret its evidence.
+- **Your schemas stay yours.** Sartorial presents a view of application
+  results. It does not replace your business data or require your `--json`
+  contract to become a Sartorial schema.
+- **Grammar and identity are separate.** Choose a `Preset` for layout character
+  and density; compose it with a `Theme` for application colours. A product
+  theme can move between presets without creating a new layout system.
+- **A small deterministic core, with terminal tools when you need them.**
+  `sartorial-core` renders from explicit capabilities and has no live-terminal
+  machinery. `sartorial` adds detection, progress, interaction, Clap support,
+  and the optional wire surface.
+- **Honest output in pipes and progress displays.** Plain rendering is
+  pipe-safe and ASCII-safe. Unknown work is activity, not a made-up percentage;
+  known progress uses real counts. Results, diagnostics, and agent JSON have
+  explicit output paths.
+- **Human and agent output have different jobs.** Human presentation can carry
+  layout and emphasis. Sartorial's agent JSON is a versioned presentation
+  envelope; your application remains responsible for its own machine schema.
+- **Dogfood with the Terrorbats example.** The repository's campaign report
+  shows one result with a product theme, two presets, plain text, and Markdown.
+  It exercises the same framework path available to downstream applications.
 
-| You want … | Use … |
+Sartorial is a Rust library, not a hosted service or a new application data
+format. It is designed for teams that want their command-line tools to feel
+coherent while keeping each tool's decisions and contracts in its own hands.
+
+## Choose your crate
+
+| Need | Crate |
 |---|---|
-| Deterministic presentation: semantic types → one `Document` → terminal / plain / Markdown, no live-terminal machinery | `sartorial-core` |
-| Terminal behaviour and integrations: capability detection, channel hygiene, live progress, prompts, Clap, completions, optional wire protocol | `sartorial` (depends on and re-exports core) |
+| Deterministic semantic model, `Document`, styles, terminal/plain/Markdown rendering | `sartorial-core` |
+| Capability detection, channels, live progress, prompts, Clap, completions, optional wire protocol | `sartorial` (re-exports core) |
+
+Until the first crates.io publication, depend on the Git repository:
 
 ```toml
 [dependencies]
-sartorial = "0.3"        # batteries-included toolkit
-# - or -
-sartorial-core = "0.3"   # tiny deterministic engine only
+sartorial = { git = "https://github.com/matthewjameswatkins1978-cyber/Sartorial" }
+# or, for the deterministic engine only:
+sartorial-core = { git = "https://github.com/matthewjameswatkins1978-cyber/Sartorial" }
 ```
 
-> **Architectural law**: *Sartorial dresses your program's semantics; it never invents them.*
-> Applications own truth (schemas, state, logging, execution). Sartorial owns presentation.
+The workspace version is `0.3.0`; crates.io coordinates will become the preferred
+installation form once that version is actually published.
 
----
+## Preset and Theme
 
-## Why Sartorial?
-
-Biscuit Logic repeatedly builds terminal software — Terrorbats, Omen, Tethers and what's next.
-The same presentation decisions recur: typography, spacing, colours, tables, status views,
-errors, prompts, keyboard conventions, progress honesty, dry-run plans, receipts, human vs
-plain vs agent output, terminal-width behaviour. Sartorial solves this once. A future builder
-or agent can simply be told:
+A **Preset** describes presentation grammar: density, title treatment, markers,
+rules, spacing, and table or progress layout. A **Theme** describes visual
+identity: accent, status, muted, evidence, and code colours. They compose:
 
 ```rust
-// "Use Sartorial."
-```
-
-Sartorial reuses mature libraries (`anstyle`, `unicode-width`, `serde`, plus `crossterm`,
-`indicatif`, `clap` in the full crate) for mechanics while owning the design language.
-
----
-
-## Preset vs Theme
-
-The core compositional idea. **Presets** are presentation *grammar* (density, title casing,
-markers, rules, gaps, table and progress treatment). **Themes** are visual *identity*
-(accent, success, warning, failure, muted, evidence, code colours). They compose freely:
-
-```rust
-use sartorial::{Config, Preset, Theme};
 use anstyle::AnsiColor;
+use sartorial::{Config, Preset, Theme};
 
-let terrorbats = Theme::builder("Terrorbats")
+let theme = Theme::builder("Terrorbats")
     .accent(AnsiColor::Red)
     .success(AnsiColor::Green)
     .warning(AnsiColor::Yellow)
     .failure(AnsiColor::Red)
     .build();
 
-// Workwear + Terrorbats. Studio + Terrorbats. No new preset per product.
 let config = Config::new()
     .with_preset(Preset::Workwear)
-    .with_theme(terrorbats);
+    .with_theme(theme);
 ```
 
-Four first-party grammars: **House** (default, quiet and restrained), **Black Tie**
-(formal, nearly monochrome), **Workwear** (dense, operator-focused), **Studio**
-(roomier, presentation-friendly). Without an explicit theme, each resolves to its
-familiar v0.2 visuals. An explicit theme is never dropped by a preset change.
+The four built-in presets are **House** (quiet and restrained), **Black Tie**
+(formal and nearly monochrome), **Workwear** (compact and operator-focused),
+and **Studio** (roomier and presentation-friendly). An explicit theme survives
+preset changes; a preset never changes the facts being rendered.
 
----
+## One Document, three static renderers
 
-## One Document, three renderers
-
-Every semantic object (`Outcome`, `Receipt`, `Plan`, `ErrorModel`, `TableModel`,
-`Notice`, screens, …) converts once into a presentation `Document` via `Presentable`:
+Use the semantic types that fit the result—such as `SummaryScreen`, `Plan`,
+`Receipt`, `ErrorModel`, or `TableModel`—and turn a presentable value into its
+shared document:
 
 ```rust
-use sartorial::{Presentable, SummaryScreen, Status};
+use sartorial::{Presentable, Status, SummaryScreen};
 
-let screen = SummaryScreen::new("Backup", Status::Ready).fact("Files", "1,204");
-let doc = screen.to_document(); // meaning resolved once
+let screen = SummaryScreen::new("Backup", Status::Ready)
+    .fact("Files", "1,204");
+let document = screen.to_document();
 ```
 
-Renderers decide spacing, glyphs and emphasis — never meaning:
+The static renderers are:
 
-- **Terminal**: styled ANSI, responsive layout, preset grammar.
-- **Plain**: pipe-safe, no ANSI, ASCII-safe, log-friendly. Same facts, zero paint.
-- **Markdown**: headings, tables, lists, GitHub callouts (`> [!WARNING]`), code —
-  built for issues, PRs, release notes, agent reports and handoffs.
+- **Terminal** for styled, width-aware human output.
+- **Plain** for no-ANSI, ASCII-safe, pipe-friendly output.
+- **Markdown** for reports, issues, pull requests, and handoffs.
 
-```rust
-use sartorial::{RenderContext, RenderMarkdown, Preset};
+The full `sartorial` crate also provides `RenderAgent` for supported Sartorial
+types. That JSON surface is separate from `Document` rendering and from your
+application's own machine-output schema.
 
-let ctx = RenderContext::markdown(Preset::House);
-println!("{}", screen.render_markdown(&ctx)?);
-```
+## Quick start
 
----
-
-## Quickstart
-
-### 1. Summary screen
+### Render a result
 
 ```rust
 use sartorial::*;
@@ -145,47 +127,44 @@ use sartorial::*;
 let screen = SummaryScreen::new("MY-TOOL", Status::Ready)
     .fact("Environment", "Production")
     .fact("Uptime", "99.98%")
-    .notice(Notice::info("All systems nominal."))
-    .action(Action::open())
-    .action(Action::quit());
+    .notice(Notice::info("All systems nominal."));
 
-print_human(&screen)?;   // stdout, respects NO_COLOR / preset / width
+let context = RenderContext::human(Preset::House);
+SartorialOutput::print_result(&screen, &context)?;
 ```
 
-### 2. Honest progress
+Use a plain context when output must be safe to redirect. Markdown and agent
+output have dedicated helpers; `print_result` rejects those targets instead of
+silently changing formats.
+
+### Report progress truthfully
 
 ```rust
-use sartorial::*;
+use sartorial::ProgressBar;
 
-// Unknown total: activity with elapsed count-up, never a fake percentage.
-let pb = ProgressBar::activity("Checking repository")
-    .with_subtask("cargo test")
-    .with_elapsed(14);
-
-// Known totals: real counts, derived percentage, contradictions rejected.
-let count = ProgressBar::count("Scanning files", 38, 60)?;
+let activity = ProgressBar::activity("Checking repository");
+let counted = ProgressBar::count("Scanning files", 38, 60)?;
 ```
 
-Live spinners live in `sartorial` (`indicatif`); static snapshots live in core.
-Results → stdout, progress/diagnostics → stderr, machine JSON → stdout only.
+Unknown totals stay indeterminate. Known totals use real counts, and
+contradictory states are rejected. Live terminal progress belongs to the full
+crate; the core can render static progress snapshots.
 
-### 3. Plans and receipts
+### Show a plan and a receipt
 
 ```rust
-use sartorial::*;
+use sartorial::Plan;
 
-let plan = Plan::new("PATH REPAIR")      // BEFORE: intent, never execution
+let plan = Plan::new("PATH REPAIR")
     .add("C:\\Tools\\bin")
     .warning("User PATH will be updated.")
     .reversible(true);
-
-let receipt = Receipt::success("PATH UPDATED")  // AFTER: truthful changes
-    .change("Added", "1 directory")
-    .unchanged("System PATH", "unchanged")
-    .guidance("Open a new shell for the changes to take effect.");
 ```
 
-### 4. Clap integration
+A `Plan` describes proposed work; constructing or rendering it does not perform
+that work. Build a `Receipt` from the operation's actual result.
+
+### Integrate Clap
 
 ```rust
 use clap::Parser;
@@ -198,52 +177,48 @@ struct Cli {
 }
 ```
 
----
+## Output channels and feature flags
 
-## Feature flags (`sartorial`)
+`SartorialOutput` routes primary human/plain results and Markdown to stdout,
+progress and diagnostics to stderr, and supported agent JSON to stdout. Agent
+mode suppresses prose diagnostics. Your own machine JSON should be serialized
+through your own schema, without Sartorial presentation text mixed into it.
 
-Default = full batteries: `terminal`, `progress`, `interactive`, `clap`, `wire`.
+The `sartorial` crate enables `terminal`, `progress`, `interactive`, `clap`,
+and `wire` by default. Disable default features to select a smaller surface.
+`sartorial-core` has no default features and does not depend on `crossterm`,
+`indicatif`, `clap`, or `serde_json`.
 
-| Feature | Pulls in | For |
+| Feature | Adds | Use |
 |---|---|---|
-| `terminal` | `crossterm` | width/TTY detection, pager |
-| `progress` | `indicatif` | live spinners and bars |
-| `interactive` | `crossterm` | prompts, keyboard, raw-mode guards |
-| `clap` / `completions` | `clap` / `clap_complete` | CLI wiring, shell completions |
-| `wire` | `serde_json` | `sartorial.v0.1` protocol compat, agent JSON, serialized `Document` |
-| `diagnostics` | nothing heavy | structured source-diagnostic → `Document` seam |
-
-Pretty static rendering needs none of the above:
-`cargo check -p sartorial-core` proves the tiny engine stays tiny.
-
----
-
-## Machine-output boundary
-
-Terrorbats machine output is a Terrorbats schema — it never has to become a
-Sartorial schema to print nicely. The `wire` feature carries Sartorial's own
-presentation envelope plus `sartorial.v0.1` compatibility, and a small
-serialized-`Document` format for language-neutral presentation. Nothing else.
-
----
+| `terminal` | `crossterm` | terminal sizing and pager support |
+| `progress` | `indicatif` | live progress bars and spinners |
+| `interactive` | `crossterm` | prompts and keyboard handling |
+| `clap` / `completions` | `clap` / `clap_complete` | CLI options and shell completions |
+| `wire` | `serde_json` | versioned Sartorial protocol and agent JSON |
+| `diagnostics` | no additional dependency | structured source-diagnostic presentation |
 
 ## Examples
 
 ```bash
-cargo run -p sartorial --example minimal        # ten-line static rendering
-cargo run -p sartorial --example one_shot       # canonical one-shot CLI wiring
-cargo run -p sartorial --example styles         # one truth, four grammars
-cargo run -p sartorial --example markdown       # GitHub-ready reports
-cargo run -p sartorial --example custom_theme   # application identity, no new preset
-cargo run -p sartorial --example terrorbats     # dogfood: Terrorbats-style campaign report
-cargo run -p sartorial --example progress       # honest activity vs counts
-cargo run -p sartorial --example plan_receipt   # dry-run plan, then receipt
-cargo run -p sartorial --bin sartorial-demo -- styles   # preset runway
+cargo run -p sartorial --example minimal
+cargo run -p sartorial --example styles
+cargo run -p sartorial --example markdown
+cargo run -p sartorial --example custom_theme
+cargo run -p sartorial --example terrorbats
+cargo run -p sartorial --example progress
+cargo run -p sartorial --example plan_receipt
 ```
 
----
+## Documentation
 
-## Verification
+- [Architecture and boundaries](docs/ARCHITECTURE.md)
+- [Integration guide](docs/INTEGRATION.md)
+- [Biscuit Logic CLI Presentation Standard](docs/BL_CLI_STANDARD.md)
+- [Core crate guide](crates/sartorial-core/README.md)
+- [Full toolkit guide](crates/sartorial/README.md)
+
+## Development checks
 
 ```bash
 cargo fmt --all --check
@@ -255,5 +230,5 @@ cargo test -p sartorial-core --no-default-features
 git diff --check
 ```
 
-See [Biscuit Logic CLI Presentation Standard (BL-CLI-01)](docs/BL_CLI_STANDARD.md) and
-the [integration guide](docs/INTEGRATION.md).
+Sartorial's architectural rule is simple: **your application owns truth;
+Sartorial owns presentation.**

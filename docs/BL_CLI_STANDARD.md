@@ -1,297 +1,114 @@
 # Biscuit Logic CLI Presentation Standard (BL-CLI-01)
-**Standard Authority**: Biscuit Logic Architecture & Engineering<br>
-**Version**: 0.2.0<br>
-**Implementation Toolkit**: Sartorial (`sartorial`)
-
----
-
-## 1. Vision & Core Philosophy
-
-Future Biscuit Logic CLI programs must not repeatedly spend engineering time designing typography, colours, tables, status views, errors, prompts, keyboard conventions, machine output modes, or progress motion.
-
-A future engineer or AI agent should be able to declare:
-> **"Use Sartorial."**
-and inherit sensible, professional presentation and interaction behaviour out of the box.
-
-### Product Character
-Sartorial's visual character is:
-- **QUIET**
-- **PRECISE**
-- **LEGIBLE**
-- **RESTRAINED**
-- **TECHNICAL**
-- **SLIGHTLY ELEGANT**
-
-Think: **well-made precision control instrument**, not a colourful terminal toy.
-
-### Anti-Patterns (Forbidden)
-- Giant ASCII art logos or loud banners.
-- Excessive borders or boxes enclosing every single element.
-- Rainbow colouring or decorative animations without state.
-- Novelty glyph overload.
-- Huge multi-page help dumps dumped into AI agent context.
-
-> [!IMPORTANT]
-> **Cardinal Rule of Presentation**:
-> **Sartorial presets alter presentation, not meaning.**
-> Applications never change their semantic state, JSON contracts, exit codes, or prompt safety depending on visual presets.
-
----
-
-## 2. Core Architectural Rule: One Truth, Multiple Views
-
-One semantic result possesses several renderers:
-
-```
-                     SEMANTIC RESULT (Outcome / Plan / Receipt / TableModel)
-                                             |
-                   +-------------------------+-------------------------+
-                   |                         |                         |
-              HUMAN VIEW                 PLAIN VIEW               AGENT VIEW
-            (Styled ANSI)               (Pipe-Safe)                 (JSON)
-```
-
-The underlying application truth **MUST NOT** be independently reconstructed or parsed across renderers.
-- **One semantic authority.**
-- **Multiple views.**
-
----
-
-## 3. Sartorial Preset System
-
-Sartorial provides exactly **four first-party presets**, resolving through a single token authority (`ResolvedStyle`):
-
-| Preset | Character | Primary Accent | Density | Typical Use |
-| :--- | :--- | :--- | :--- | :--- |
-| **House** *(Default Authority)* | Quiet, cool, precise, modern, restrained | Restrained Cyan/Slate | Standard | Standard for almost all tools |
-| **Black Tie** | Formal, nearly monochrome, elegant, controlled | Bright White / Mono | Standard | Release tools, security, administrative audit |
-| **Workwear** | Dense, fast, practical, operator-focused | Industrial Amber/Yellow | Compact | High-frequency developer workflows, operators |
-| **Studio** | Refined, slightly expressive, presentation-friendly | Magenta / Violet | Roomy | Demos, showcases, onboarding guides |
-
-### Token Resolution Order:
-```
-House Default Preset -> Selected Preset -> Accessibility Overrides -> Explicit Caller Overrides -> ResolvedStyle
-```
-Components consume `ResolvedStyle` from `RenderContext` rather than querying which preset is active.
-
----
-
-## 4. BL Motion Standard
-
-Motion in Sartorial is an honest representation of operational state. A tool doing real work should not appear dead, but movement must never fabricate progress.
-
-### Semantic Progress Modes:
-1. **Activity**: Use when total work is **unknown**. Favours an honest **elapsed count-up**. Never invents fake percentages.
-   ```
-   ◐ Checking repository · cargo test                 14s
-   ```
-2. **Count**: Use when completed and total items are known.
-   ```
-   Scanning files                         38 / 60
-   ```
-3. **Percent**: Use only when percentage is genuinely derived from known progress.
-   ```
-   Building        ━━━━━━━━━━━╸━━━━━━     63%
-   ```
-4. **Countdown**: Use only for real future timing events. Never used decoratively.
-   ```
-   Retrying connection in 17s
-   ```
-5. **Rate**: Use when meaningful throughput exists.
-   ```
-   Downloading artifacts      84 MB / 140 MB      11 MB/s
-   ```
-6. **ETA**: Derived only when sufficient real samples exist; prefer no ETA to a nonsense ETA.
-
-### Preset Motion Character:
-- **House**: Restrained spinner (`◐`), clean progress bar (`━━━━╸───`), honest elapsed time.
-- **Black Tie**: Almost static, tiny pulse dot (`•`), numeric count and elapsed time.
-- **Workwear**: Compact numeric format prioritizing screen real estate:
-  ```
-  [38/60] 63%  00:14  cargo test
-  ```
-- **Studio**: Smoothest motion, expressive tick, refined progress bar.
-
-### Motion Policy (`MotionMode`):
-- `Auto`: Animate only on attended interactive TTYs. Disabled in CI, non-TTY pipes, and redirected streams.
-- `Always`: Force animation (testing/demos).
-- `Never`: Emit static snapshots.
-- **JSON Guard**: Agent JSON output **MUST NEVER** contain spinner frames or animation tokens.
-
----
-
-## 5. Visual & Typographic Hierarchy
-
-The visual hierarchy guides the eye with weight and alignment rather than loud colours:
-
-| Level | Component | Style & Treatment | Purpose |
-| :--- | :--- | :--- | :--- |
-| **L1** | **PROGRAM TITLE** | Bold, Accent color, Uppercase | Visually strongest textual identifier. Compact. |
-| **L2** | **SECTION** | Bold, normal weight/accent, subtle padding | Clear division of concerns. Quieter than Title. |
-| **L3** | **LABEL** | Subdued / Dim (`BrightBlack`) | Contextual key (e.g. `Environment`, `Path`). |
-| **L4** | **VALUE** | High legibility (Normal / White) | The substantive data point. |
-| **L5** | **PRIMARY STATUS** | Symbol + Uppercase label (`✓ READY`, `× FAILED`) | Immediately scannable state. |
-| **L6** | **SECONDARY NOTE** | Muted / Dim | Explanations, units, references (`ms`, `GB`). |
-| **L7** | **KEY COMMAND** | Bracketed hotkey `[I] Install   [Q] Quit` | Teaches interaction directly in view footer. |
-| **L8** | **ERROR** | Bold Red headline, structured body | What happened, why, and what next. |
-
-### Color Rules & Redundancy
-Colour is never used as the sole conveyor of meaning. Status glyphs ensure legibility even in monochrome terminals or with colour blindness:
-
-| Semantic State | Unicode Glyph | ASCII Fallback | Color Treatment | Meaning |
-| :--- | :---: | :---: | :--- | :--- |
-| **Ready** | `✓` | `[OK]` | Bold Green | Succeeded, verified, operational |
-| **Attention** | `!` | `[!]` | Bold Yellow | Warning, incomplete, attention needed |
-| **Failed** | `×` | `[X]` | Bold Red | Error, verification failed |
-| **Running** | `●` | `[*]` | Bold Cyan | In-flight execution |
-| **Pending** | `○` | `[.]` | Muted Gray | Queued, waiting |
-| **Skipped** | `–` | `[-]` | Muted Gray | Intentionally bypassed |
 
----
+**Standard authority:** Biscuit Logic Architecture & Engineering<br>
+**Standard version:** 0.2.0<br>
+**Rust implementation toolkit:** Sartorial 0.3
 
-## 6. Operation UX: Plan & Receipt
+This document defines presentation principles for Biscuit Logic command-line
+applications. It is a product standard, not a claim that every language,
+interaction pattern, or policy below is implemented by Sartorial. The current
+Rust crate boundaries and implemented behavior are documented in the
+[architecture guide](ARCHITECTURE.md) and [integration guide](INTEGRATION.md).
 
-### 1. Plan (Dry-Run Presentation)
-For consequential operations **before** they happen. Presents intent without executing:
-```
-PATH REPAIR
-
-Proposed changes
-
-+ C:\Users\Matmus\.cargo\bin
-~ C:\Program Files\Git\cmd
+## 1. Product character
 
-User PATH will be updated; system PATH remains untouched.
-Existing terminal processes will not inherit this update.
+CLI output should be quiet, precise, legible, restrained, technical, and
+slightly elegant: a well-made control instrument rather than a colourful
+terminal toy.
 
-[A] Apply   [D] Details   [Q] Cancel
-```
-Supports additions (`+`), removals (`-`), modifications (`~`), consequences, warnings, and reversibility indicators.
+Avoid oversized banners, borders around every element, colour without meaning,
+decorative motion, novelty glyphs, and help output that buries useful context.
 
-### 2. Receipt (Post-Operation Presentation)
-For after a state-changing operation completes:
-```
-✓ PATH UPDATED
+## 2. One truth, multiple presentations
 
-Added       1 directory
-Removed     0 entries
-Duplicates  0
+Applications own their state, business decisions, schemas, logs, execution,
+and operation results. A presentation toolkit can format a semantic view of
+that truth; it must not invent or change it.
 
-Open a new shell for the change to take effect.
-```
-Truthfully reflects what changed, what remained unchanged, warnings, next actions, and evidence handles.
+For Sartorial 0.3, Rust semantic presentation values converge on one
+`Document`, rendered as Terminal, Plain, or Markdown. Sartorial's optional
+Agent JSON surface is a separate presentation envelope for supported types.
+Application `--json` remains application-owned.
 
----
+## 3. Presentation grammar and identity
 
-## 7. Keyboard Interaction & Safety Grammar
+In Sartorial, a **Preset** selects grammar such as density, title treatment,
+markers, spacing, and component layout. A **Theme** supplies visual identity,
+including application colours. Presets and themes change presentation only;
+they must not change facts, evidence, statuses, schemas, exit behavior, or
+prompt safety.
 
-Interactive tools must adhere strictly to the BL standard keyboard mapping:
+Sartorial 0.3 provides four presets: House, Black Tie, Workwear, and Studio.
+`ResolvedStyle` carries concrete style decisions to renderers.
 
-| Key | Canonical Action | Description |
-| :--- | :--- | :--- |
-| `Enter` | **Open / Accept** | Activate selected item or confirm default choice |
-| `Esc` | **Back / Cancel** | Step back one screen level or abort |
-| `↑` / `↓` | **Navigate** | Move highlight up or down |
-| `←` / `→` | **Switch** | Toggle between related views or tabs |
-| `Space` | **Select / Toggle** | Toggle checkbox or selection |
-| `/` | **Find / Filter** | Open inline search filter |
-| `?` | **Help** | Display contextual keybindings & explanations |
-| `D` | **Details** | Open deep progressive disclosure view |
-| `R` | **Retry / Refresh** | Re-run check or refresh data |
-| `Q` | **Quit** | Gracefully exit application |
+## 4. Progress must mean something
 
-### Interaction Authority & Non-Interactive Safety
-- `Config::InteractiveMode` (`Auto`, `On`, `Off`) is the single authority governing interactivity.
-- `Auto` verifies both `stdin` and `stdout` are interactive TTYs.
-- `Confirm` and `Choice` are strictly **fail-closed** when non-interactive. They never silently assume confirmation or selection unless the caller explicitly configures a non-interactive fallback.
-- `Choice` redraw uses event-driven blocking reads with wrapped-row accounting, eliminating idle reprint spam and cursor drift.
+Progress should communicate only state the application knows:
 
----
+- Use activity for work with an unknown total; do not invent a percentage.
+- Use counts when completed and total work are known; derive the percentage.
+- Use a countdown only for a real timed wait.
+- Do not show an ETA without sufficient real measurements.
+- Keep progress output separate from primary results.
 
-## 8. Output Channels & Hygiene
+Sartorial 0.3 models activity, count, and countdown states. Invalid count
+states are rejected and zero totals remain indeterminate. Its full crate can
+drive live terminal progress; the core can render static progress. Plain,
+Markdown, and Agent targets remain static.
 
-Output channels must be deliberate and segregated:
-- **STDOUT**: Primary operation results, final human output, and clean JSON.
-- **STDERR**: Progress diagnostics, animation frames, non-fatal warnings, and notices.
-- **Agent JSON (`--json`)**: Emitted exclusively to STDOUT. Completely free of ANSI sequences, progress animation, or prose warnings.
+## 5. Meaning should not depend on colour
 
----
+Use labels, symbols, and structure as well as colour to communicate state.
+Output should remain understandable when colour is absent. Plain output
+should avoid ANSI escape sequences and use ASCII-safe presentation.
 
-## 9. Semantic Exit Contract
+Sartorial supports colour policy, symbol mode, and explicit capability
+resolution. These are presentation capabilities; applications remain
+responsible for accessibility of their complete interaction and content.
 
-Downstream applications consume typed exit codes adhering to cross-platform conventions:
-- `0`: Success (POSIX standard, affirmative response).
-- `1`: Declined (User explicitly denied or answered negatively, e.g. confirm "no").
-- `2`: Invalid request / command line usage error / protocol schema version mismatch.
-- `3`: Requested capability or environment dependency unavailable.
-- `4`: Verification check or core operation failed, or non-interactive request denied without fallback.
-- `130`: Interrupted or cancelled by user (`SIGINT` / Esc).
+## 6. Plans, receipts, and honest actions
 
----
+A plan presents proposed work before it happens. Showing or rendering a plan
+must not perform the operation. A receipt describes the operation that
+actually happened. Build it from the result, including what did not change
+when that matters.
 
-## 10. Long-Line Sanity & Table Boundaries
+Display an action key only when the application handles that key. Do not
+present a dead key as an available interaction. Prompts should fail closed
+when interaction is unavailable unless the caller deliberately configures a
+fallback.
 
-No absurd path, URL, or compiler error should break terminal presentation:
-- Unicode display width accuracy is enforced across all cells and strings.
-- Long paths are truncated from the middle (`truncate_path`), preserving both directory root and target filename (`C:\Users\...\threadmoth.exe`).
-- Tables strictly bound total rendered width to terminal width. On absurdly tiny terminals (e.g. width < 15), columns shrink down to 1 cell and rightmost non-primary columns drop gracefully, guaranteeing the table line never exceeds the claimed terminal width.
+Sartorial provides Plan, Receipt, Action, Confirm, and Choice presentation
+types. The application owns execution, accepted-choice meaning, and side
+effects.
 
----
+## 7. Output-channel honesty
 
-## 11. Paging Policy
+Keep primary results on stdout and progress or diagnostics on stderr. Machine
+output should be a clean, explicitly selected application schema, without
+human presentation noise.
 
-Long interactive output should be pleasant without trapping machine pipelines:
-- `PagerMode::Auto`: Pages only when stdout is an attended TTY and output exceeds screen height.
-- **Machine Safety**: Plain output (`--plain`) and Agent JSON (`--json`) are **never** piped into an interactive pager.
+Sartorial's output helpers route human/plain and Markdown results to stdout,
+progress and diagnostics to stderr, and supported Agent JSON to stdout.
+Agent-mode prose progress and diagnostics are suppressed. Helpers do not
+serialize an application's business JSON.
 
----
+## 8. Language-neutral contracts
 
-## 12. Configuration Provenance
-
-Applications explaining origin values can attach provenance without polluting generic facts:
-- `Flag` (e.g. `--endpoint`)
-- `Environment` (e.g. `SARTORIAL_COLOR`)
-- `ProjectConfig` (e.g. `biscuit.toml`)
-- `UserConfig` (e.g. `~/.config/biscuit.json`)
-- `Default`
-- `Other`
-
----
-
-## 13. Accessibility Standard
-
-Accessibility is an override layer across all presets, never a separate visual skin:
-- **Colour Redundancy**: Meaning is always conveyed via symbols and text alongside colour.
-- **Reduced Motion**: Disables animation frames; preserves static counts, elapsed time, and percentages.
-- **Plain Mode**: Pure ASCII glyphs, zero ANSI escape codes, screen-reader friendly.
-
----
-
-## 14. When an Application May Deviate
-
-An application may deviate from Sartorial defaults **only** when:
-1. Delivering specialized visual data rendering (e.g., a hex editor, full visual diff view, or terminal charting canvas).
-2. The user has explicitly selected custom branding colors (configured via `Config::with_accent(...)`).
-
-Standard CLI output, inventory lists, status reports, and error messages should **not** invent new visual layouts or color schemes.
-
----
-
-## 15. Language-Neutral Driver & Protocol Versioning
-
-Sartorial provides a language-neutral CLI executable (`sartorial`) enabling non-Rust programs (Python, Node, Go, C#, OCaml, shell scripts) to consume the full presentation system.
-
-### Protocol Schema Versioning
-- Canonical schema version: `sartorial.v0.1`
-- Top-level schema version is required on all inbound JSON rendering envelopes.
-- Streaming JSONL progress events support optional or defaulted `schema_version`.
-- If an unsupported schema version is provided, Sartorial rejects the input with exit code `2` (`UsageError`) and the error:
-  `unsupported protocol schema_version: got <version>, expected sartorial.v0.1`
-
-### Structured Results
-External prompt commands (`sartorial confirm` and `sartorial choice`) emit strictly typed, machine-readable JSON via `ConfirmResult` and `ChoiceResult`. Output fields are safely serialized via `serde_json` to handle quotes, newlines, tabs, and Unicode without escaping defects.
-
-### Streaming JSONL
-- `sartorial stream`: drives live progress on attended terminals (10 Hz steady tick, zero repeated-line spam) and clean line-oriented bounded messages on non-TTY environments.
-- `sartorial stream --json`: emits normalized, validated canonical JSONL to STDOUT with zero bytes on STDERR.
-
+Sartorial's optional wire feature provides versioned presentation contracts:
+`sartorial.v0.1` compatibility and the distinct
+`sartorial.document.v0.1` serialized Document format. Neither is a universal
+application schema. Other languages may adopt this presentation boundary,
+but their business contracts remain their own.
+
+## 9. Keep the implementation boundary explicit
+
+The standard describes desired CLI behavior across Biscuit Logic projects.
+Sartorial is the Rust implementation, not an automatic enforcement layer for
+every application. Application owners still decide their semantic models,
+JSON, exit codes, keyboard bindings, logging, and operation safety.
+
+The Sartorial repository's Terrorbats example is dogfood for the presentation
+path: the same campaign result uses a product theme with two presets and is
+also rendered as Plain and Markdown. The theme and fixture remain example
+code; Sartorial does not depend on the Terrorbats application.
