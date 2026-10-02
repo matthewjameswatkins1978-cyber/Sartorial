@@ -1,38 +1,21 @@
-[package]
-name = "sartorial"
-version = "0.2.0"
+[workspace]
+members = ["crates/sartorial-core", "crates/sartorial"]
+resolver = "2"
+
+[workspace.package]
+version = "0.3.0"
 edition = "2021"
 authors = ["Matthew Watkins <matthew@biscuitlogic.com>"]
-description = "An opinionated Rust presentation toolkit for command-line applications."
-readme = "README.md"
 repository = "https://github.com/matthewjameswatkins1978-cyber/Sartorial"
+license = "MIT"
 
-[dependencies]
+[workspace.dependencies]
 anstyle = "1.0"
-anstream = "0.6"
-crossterm = "0.28"
-indicatif = { version = "0.17", default-features = false }
 unicode-width = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-clap = { version = "4.5", features = ["derive"], optional = true }
-clap_complete = { version = "4.5", optional = true }
-
-[dev-dependencies]
+anstream = "0.6"
+crossterm = "0.28"
+indicatif = { version = "0.17", default-features = false }
 clap = { version = "4.5", features = ["derive"] }
-tempfile = "3.17"
-
-[features]
-default = ["clap"]
-clap = ["dep:clap"]
-completions = ["dep:clap_complete", "clap"]
-
-[[bin]]
-name = "sartorial"
-path = "src/bin/sartorial.rs"
-required-features = ["clap"]
-
-[[bin]]
-name = "sartorial-demo"
-path = "src/bin/sartorial-demo.rs"
-required-features = ["clap"]
+clap_complete = "4.5"

@@ -1,0 +1,51 @@
+[package]
+name = "sartorial"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "Batteries-included terminal presentation toolkit: sartorial-core plus capability detection, live progress, interaction, Clap integration, and optional wire protocol."
+readme = "README.md"
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+sartorial-core = { version = "0.3.0", path = "../sartorial-core" }
+anstyle.workspace = true
+anstream.workspace = true
+unicode-width.workspace = true
+serde.workspace = true
+crossterm = { workspace = true, optional = true }
+indicatif = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+clap = { workspace = true, optional = true }
+clap_complete = { workspace = true, optional = true }
+
+[dev-dependencies]
+clap = { version = "4.5", features = ["derive"] }
+serde_json = "1.0"
+tempfile = "3.17"
+
+[features]
+default = ["terminal", "progress", "interactive", "clap", "wire"]
+# Terminal capability detection (width, TTY) and pager support.
+terminal = ["dep:crossterm"]
+# Live progress bars and spinners via indicatif.
+progress = ["dep:indicatif"]
+# Interactive prompts and keyboard handling via crossterm.
+interactive = ["dep:crossterm"]
+clap = ["dep:clap"]
+completions = ["dep:clap_complete", "clap"]
+# Language-neutral presentation wire protocol (sartorial.v0.1 compat) and agent JSON.
+wire = ["dep:serde_json"]
+# Structured source-diagnostic presentation seam (no heavy deps; miette adapter-ready).
+diagnostics = []
+
+[[bin]]
+name = "sartorial"
+path = "src/bin/sartorial.rs"
+required-features = ["clap", "wire"]
+
+[[bin]]
+name = "sartorial-demo"
+path = "src/bin/sartorial-demo.rs"
+required-features = ["clap", "wire"]

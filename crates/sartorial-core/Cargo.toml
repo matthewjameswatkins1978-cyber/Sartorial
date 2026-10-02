@@ -1,0 +1,17 @@
+[package]
+name = "sartorial-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "Tiny deterministic presentation engine underneath Sartorial. Semantic model plus Document plus resolved styling plus terminal/plain/markdown renderers. No live-terminal machinery."
+readme = "README.md"
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+anstyle.workspace = true
+unicode-width.workspace = true
+serde.workspace = true
+
+[features]
+default = []
