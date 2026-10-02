@@ -13,12 +13,17 @@ For the crate split and data flow, see [Architecture](ARCHITECTURE.md).
 | Deterministic semantic types, one `Document`, terminal/plain/Markdown renderers | `sartorial-core` |
 | Detection, channel helpers, live progress, prompts, Clap, completions, optional wire | `sartorial` |
 
+Until the first crates.io publication, use the Git repository:
+
 ```toml
 [dependencies]
-sartorial-core = "0.3"
+sartorial = { git = "https://github.com/matthewjameswatkins1978-cyber/Sartorial" }
 # or
-sartorial = "0.3"
+sartorial-core = { git = "https://github.com/matthewjameswatkins1978-cyber/Sartorial" }
 ```
+
+The workspace version is `0.3.0`; switch to crates.io coordinates after that
+version is actually published.
 
 ## Choose a presentation type
 
@@ -72,7 +77,6 @@ let screen = SummaryScreen::new("Backup", Status::Ready)
     .fact("Files", "1,204");
 let context = RenderContext::human(Preset::House);
 SartorialOutput::print_result(&screen, &context)?;
-# Ok::<(), std::io::Error>(())
 ```
 
 For redirected output, explicitly select a plain target:
