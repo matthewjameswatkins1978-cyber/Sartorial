@@ -20,4 +20,4 @@ Dependencies: `anstyle`, `unicode-width`, `serde`. No `crossterm`, no
 `indicatif`, no `clap`, no `serde_json`. Verify with
 `cargo tree -p sartorial-core`.
 
-Part of the [Sartorial](../../README.md) workspace (`sartorial-core 0.3.0`).
+Part of the [Sartorial](../../README.md) workspace (`sartorial-core 0.5.0`).

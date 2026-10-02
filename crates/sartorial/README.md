@@ -22,5 +22,5 @@ runtime terminal behaviour or application integration:
 Use `sartorial-core` when you want deterministic presentation; use
 `sartorial` when you want terminal behaviour and integrations.
 
-Part of the [Sartorial](../../README.md) workspace (`sartorial 0.3.0`).
+Part of the [Sartorial](../../README.md) workspace (`sartorial 0.5.0`).
 See the [integration guide](../../docs/INTEGRATION.md).

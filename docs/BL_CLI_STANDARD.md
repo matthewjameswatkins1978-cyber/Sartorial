@@ -2,7 +2,7 @@
 
 **Standard authority:** Biscuit Logic Architecture & Engineering<br>
 **Standard version:** 0.2.0<br>
-**Rust implementation toolkit:** Sartorial 0.3
+**Rust implementation toolkit:** Sartorial 0.5
 
 This document defines presentation principles for Biscuit Logic command-line
 applications. It is a product standard, not a claim that every language,
@@ -25,7 +25,7 @@ Applications own their state, business decisions, schemas, logs, execution,
 and operation results. A presentation toolkit can format a semantic view of
 that truth; it must not invent or change it.
 
-For Sartorial 0.3, Rust semantic presentation values converge on one
+For Sartorial 0.5, Rust semantic presentation values converge on one
 `Document`, rendered as Terminal, Plain, or Markdown. Sartorial's optional
 Agent JSON surface is a separate presentation envelope for supported types.
 Application `--json` remains application-owned.
@@ -38,7 +38,7 @@ including application colours. Presets and themes change presentation only;
 they must not change facts, evidence, statuses, schemas, exit behavior, or
 prompt safety.
 
-Sartorial 0.3 provides four presets: House, Black Tie, Workwear, and Studio.
+Sartorial 0.5 provides four presets: House, Black Tie, Workwear, and Studio.
 `ResolvedStyle` carries concrete style decisions to renderers.
 
 ## 4. Progress must mean something
@@ -51,7 +51,7 @@ Progress should communicate only state the application knows:
 - Do not show an ETA without sufficient real measurements.
 - Keep progress output separate from primary results.
 
-Sartorial 0.3 models activity, count, and countdown states. Invalid count
+Sartorial 0.5 models activity, count, and countdown states. Invalid count
 states are rejected and zero totals remain indeterminate. Its full crate can
 drive live terminal progress; the core can render static progress. Plain,
 Markdown, and Agent targets remain static.
