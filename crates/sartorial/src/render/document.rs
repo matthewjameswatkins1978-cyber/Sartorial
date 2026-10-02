@@ -57,22 +57,53 @@ converge!(
 // impls live beside the component shims (`components::plan`,
 // `components::receipt`) to keep one reviewable owner per type.
 
-/// Small serialized presentation wire format (requires the `wire` feature).
+/// Schema identifier for the serialized Sartorial Document envelope.
+#[cfg(feature = "wire")]
+pub const DOCUMENT_SCHEMA_VERSION: &str = "sartorial.document.v0.1";
+
+#[cfg(feature = "wire")]
+#[derive(serde::Serialize, serde::Deserialize)]
+struct DocumentEnvelope {
+    #[serde(deserialize_with = "deserialize_document_schema")]
+    schema: String,
+    document: Document,
+}
+
+#[cfg(feature = "wire")]
+fn deserialize_document_schema<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let schema = <String as serde::Deserialize>::deserialize(deserializer)?;
+    if schema != DOCUMENT_SCHEMA_VERSION {
+        return Err(serde::de::Error::custom(format!(
+            "unsupported Sartorial Document schema: {schema}; expected {DOCUMENT_SCHEMA_VERSION}"
+        )));
+    }
+    Ok(schema)
+}
+
+/// Small versioned serialized presentation wire format (requires the `wire` feature).
 ///
 /// This is presentation wire format, never an application business schema:
 /// applications keep their own machine schemas and use Sartorial only to
 /// present them.
 #[cfg(feature = "wire")]
 pub fn document_to_json(doc: &Document, pretty: bool) -> Result<String, serde_json::Error> {
+    let envelope = DocumentEnvelope {
+        schema: DOCUMENT_SCHEMA_VERSION.to_string(),
+        document: doc.clone(),
+    };
     if pretty {
-        serde_json::to_string_pretty(doc)
+        serde_json::to_string_pretty(&envelope)
     } else {
-        serde_json::to_string(doc)
+        serde_json::to_string(&envelope)
     }
 }
 
-/// Deserialize a presentation document produced by [`document_to_json`].
+/// Deserialize a versioned presentation document produced by [`document_to_json`].
 #[cfg(feature = "wire")]
 pub fn document_from_json(s: &str) -> Result<Document, serde_json::Error> {
-    serde_json::from_str(s)
+    let envelope: DocumentEnvelope = serde_json::from_str(s)?;
+    Ok(envelope.document)
 }
