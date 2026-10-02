@@ -10,7 +10,7 @@ use sartorial::{
 fn main() -> std::io::Result<()> {
     let ctx = RenderContext::markdown(Preset::House);
 
-    let screen = SummaryScreen::new("Release 0.3.0", Status::Ready)
+    let screen = SummaryScreen::new("Release 0.5.0", Status::Ready)
         .fact("Crates", "2")
         .fact("Tests", "all green")
         .notice(Notice::tip("See the workspace layout in the README."))
@@ -23,7 +23,7 @@ fn main() -> std::io::Result<()> {
     println!("{}", table.render_markdown(&ctx)?);
 
     let plan = Plan::new("Publish")
-        .add("sartorial-core 0.3.0")
+        .add("sartorial-core 0.5.0")
         .reversible(false);
     println!("{}", plan.render_markdown(&ctx)?);
 
