@@ -1,74 +1,51 @@
-# Sartorial Integration Guide
+# Integration guide
 
-One page for the application builder. **Sartorial dresses your program's
-semantics; it never invents them.** Applications own truth. Sartorial owns
-presentation.
+Sartorial presents application semantics; it does not define them. Keep
+business state, validation, logging, execution, and application JSON in your
+program. Choose Sartorial types for the human-facing view of a result.
 
-## Use `sartorial-core` when … / `sartorial` when …
+For the crate split and data flow, see [Architecture](ARCHITECTURE.md).
 
-| You want … | Use … |
+## Choose a crate
+
+| Need | Use |
 |---|---|
-| Deterministic pretty-printing with no terminal machinery | `sartorial-core` |
-| Capability detection, live progress, prompts, Clap, completions, wire | `sartorial` (re-exports core) |
+| Deterministic semantic types, one `Document`, terminal/plain/Markdown renderers | `sartorial-core` |
+| Detection, channel helpers, live progress, prompts, Clap, completions, optional wire | `sartorial` |
 
 ```toml
 [dependencies]
-sartorial-core = "0.3"   # tiny engine: Document + Preset + Theme + renderers
-# - or -
-sartorial = "0.3"        # batteries-included terminal toolkit
+sartorial-core = "0.3"
+# or
+sartorial = "0.3"
 ```
 
-## Decision table: I have X → use Y
+## Choose a presentation type
 
-| I have … | Use … | Notes |
+| Application result | Sartorial model | Keep in mind |
 |---|---|---|
-| A result snapshot to summarize | `SummaryScreen::new(title, status)` + `.fact()` + optional `.with_table()` | Status describes *completion* (Ready/Attention/Failed), never health |
-| A long inventory or record list | `ListScreen::new(title, table)` | Table carries the data; no raw struct dumps |
-| One entity with deep evidence | `DetailScreen` / `DetailView` + `Evidence` | Progressive disclosure, not a wall of text |
-| A scan with unknown total work | `ProgressBar::activity(task)` + `update_subtask` per phase | Never set counts or percents you don't have |
-| Known completed/total items | `ProgressBar::count(task, done, total)` | Totals must be real; contradictions are rejected |
-| A real future wait | `ProgressBar::countdown(task, secs)` | Only for genuine timing events |
-| A consequential dry run | `Plan::new(title)` + `add_change` / `warning` / `consequence` | Rendering a Plan must never mutate anything |
-| A completed state change | `Receipt::success(title)` + `.change()` from the **actual** result | Never reconstruct what "probably happened" |
-| A fatal failure | `ErrorModel::new(what)` + `.with_why()` when genuinely known | Omit `why` rather than guessing; uncertainty is preserved |
-| A non-fatal warning | `Notice::warning(msg)` | Warnings stay notices; never promote them to errors |
-| A next step with no working key | Omit it; attach only keys the app really handles | Dead keys are worse than no keys — a notice can carry the guidance instead |
-| A next step with a working key | `Action::new(key, id, label)` | Only if the keypress is really handled |
-| A compiler/test-style span | `Diagnostic` (`diagnostics` feature) + file/line/label/code/help | Renders as an error document; adapt to miette on your side if needed |
-| A GitHub issue / PR / handoff | `RenderMarkdown::render_markdown()` on any `Presentable` | Headings, tables, callouts — no terminal styling |
-| Machine output | Your own schema with plain `serde_json`; `RenderAgent` only for Sartorial's own envelope | Never wrap your app JSON in a Sartorial envelope |
+| A result snapshot | `SummaryScreen` / `Outcome` | Status describes the result you supply. |
+| A long record list | `ListScreen` and `TableModel` | Preserve your records as the source of truth. |
+| One entity with supporting detail | `DetailScreen` / `DetailView` and `Evidence` | Include only evidence the application has. |
+| Work with unknown total | `ProgressBar::activity(task)` | Do not invent a count, percent, or ETA. |
+| Work with known total | `ProgressBar::count(task, done, total)` | Counts must describe real work; invalid states fail. |
+| A real timed wait | `ProgressBar::countdown(task, seconds)` | Use for a genuine countdown. |
+| A consequential proposed change | `Plan` | Describe intent before the operation; rendering does not execute it. |
+| A completed state change | `Receipt` | Build it from the actual operation result. |
+| A failure | `ErrorModel` | Omit an unknown cause rather than guessing. |
+| A non-fatal warning | `Notice::warning(...)` | Keep warnings distinct from failures. |
+| A Markdown report | `RenderMarkdown` | Use the static Markdown renderer. |
+| Application machine output | Your schema and serializer | Do not route business JSON through Sartorial presentation models. |
 
-## The Document model
+For a custom view, implement `Presentable::to_document()` and let the static
+renderers handle terminal, plain text, and Markdown. Sartorial renderers decide
+formatting, not whether the application succeeded or what its evidence means.
 
-Higher-level objects converge through one path:
-
-```
-SummaryScreen ──┐
-Receipt ────────┤
-Plan ───────────┤
-Error ──────────┤                  ┌──► Terminal
-Table ──────────┼──► Document ─────┼──► Plain
-Custom view ────┤  (Presentable)   └──► Markdown
-Detail ─────────┤
-List ───────────┘
-```
-
-Meaning is resolved **before** renderer-specific formatting. Implement
-`Presentable::to_document()` for custom views; the three renderers handle the
-rest. Renderers decide spacing, wrapping, glyphs and emphasis — never whether
-something succeeded or what evidence means.
-
-## Preset vs Theme
-
-- **Preset** = presentation *grammar*: density, title casing, markers, rules,
-  gaps, table and progress treatment. One of `House`, `BlackTie`, `Workwear`,
-  `Studio`.
-- **Theme** = visual *identity*: accent, heading, success, warning, failure,
-  muted, evidence, code, path, number. Built by applications:
+## Preset and Theme
 
 ```rust
-use sartorial::{Config, Preset, Theme};
 use anstyle::AnsiColor;
+use sartorial::{Config, Preset, Theme};
 
 let theme = Theme::builder("Terrorbats")
     .accent(AnsiColor::Red)
@@ -78,86 +55,98 @@ let theme = Theme::builder("Terrorbats")
     .build();
 
 let config = Config::new()
-    .with_preset(Preset::Workwear)   // grammar
-    .with_theme(theme);              // identity
+    .with_preset(Preset::Workwear)
+    .with_theme(theme);
 ```
 
-Rules: presets never change facts, ordering, statuses, warnings, or agent
-JSON (only layout voice). Themes never change facts either (only paint).
-An explicit theme survives preset changes; without one, each preset resolves
-to its familiar default visuals. After resolution, `ResolvedStyle` carries
-concrete decisions — renderers never branch on preset or theme identity.
+Presets control layout grammar; themes provide visual identity. Both affect
+presentation only. The four built-in presets are House, Black Tie, Workwear,
+and Studio. An explicit theme survives preset changes.
 
-## Capabilities: detect once
-
-Core consumes an explicit `Capabilities` value (width, TTY, colour, Unicode,
-hyperlinks, motion, interactivity) and never sniffs the environment while
-rendering. The full crate detects once (`RenderContext::detect()`), builds the
-capabilities, and passes them down — which is why output is deterministic in
-tests, pipes, and on Windows.
-
-## Output and channel rules (the whole contract)
-
-- Results → **stdout** via `SartorialOutput::print_result`.
-- Progress, warnings, diagnostics → **stderr** (`print_progress` / `print_diagnostic`).
-- Markdown documents → **stdout** via `SartorialOutput::print_markdown`.
-- Agent JSON → **stdout only**; progress is suppressed entirely in Agent mode.
-- `--json` machine output must be your own schema with **zero** presentation noise.
-- `NO_COLOR` and `ColorChoice::Never` strip paint without changing layout.
-- Plain target is ASCII-safe and redirect-safe by construction.
-
-## TTY behavior you must know
-
-- `RenderContext::detect()` reads the **stdout** TTY (color, symbols, width).
-- `ProgressBar::start_live()` reads the **stderr** TTY (spinners draw on stderr).
-- The split is deliberate: piped results stay clean while an attended
-  terminal still animates, and vice versa. Pass an explicit boolean with
-  `start_live_with_tty` in tests.
-- `MotionMode::Never` overrides every preset; plain, Markdown and agent
-  targets never animate; `NO_COLOR` kills color everywhere without changing layout.
-
-## Progress honesty (non-negotiable)
-
-- Unknown work gets **activity** progress, never a fabricated percentage.
-- Known totals show real counts and derived percentages; contradictions and
-  `current > total` are rejected at the semantic boundary.
-- Zero totals stay indeterminate (`None`), never fake 100%.
-- Minimal/Numeric treatments reprint one static line per semantic change —
-  never busy ticks.
-
-## Minimal wiring (one-shot CLI)
+## Render a result
 
 ```rust
-use sartorial::{Preset, RenderContext, SartorialOutput, SummaryScreen, Status};
+use sartorial::{Preset, RenderContext, SartorialOutput, Status, SummaryScreen};
 
-// Human House view for terminals; explicit pipe-safe plain for pipes.
-let ctx = RenderContext::human(Preset::House);
-SartorialOutput::print_result(&screen, &ctx)?;
-
-// Machine mode: your own data, your own JSON, stdout only, stderr silent.
-// (Do NOT route application JSON through Sartorial types.)
+let screen = SummaryScreen::new("Backup", Status::Ready)
+    .fact("Files", "1,204");
+let context = RenderContext::human(Preset::House);
+SartorialOutput::print_result(&screen, &context)?;
+# Ok::<(), std::io::Error>(())
 ```
 
-Full worked examples: `examples/one_shot.rs`, `examples/minimal.rs`,
-`examples/terrorbats.rs` (custom-theme dogfood), `examples/markdown.rs`.
+For redirected output, explicitly select a plain target:
 
-## Feature flags
+```rust
+use sartorial::{Preset, RenderContext, RenderTarget};
 
-Default is the full toolkit (`terminal`, `progress`, `interactive`, `clap`,
-`wire`). Trim by depending with `default-features = false` and adding back
-only what the product needs; `sartorial-core` alone covers static rendering.
-The `wire` feature is the only way `serde_json`/protocol surface enters;
-`diagnostics` adds the source-diagnostic seam with no heavy dependencies.
+let context = RenderContext::human(Preset::House)
+    .with_target(RenderTarget::Plain);
+```
 
-## Traps
+Alternatively use `RenderContext::plain()` or `plain_preset(...)`. Plain
+output has no ANSI and uses ASCII-safe rendering. Selecting a plain target is
+an explicit presentation choice; applications decide when to make that choice.
 
-1. **Dead keys.** Attaching `Action::new('d', …)` when no key handling exists
-   prints a fake `[D]` prompt. Attach only keys the application really
-   handles; put the guidance in a notice instead.
-2. **Fake progress.** `Activity` mode exists precisely so unknown work never
-   needs a percentage. Totals that aren't real are lies with numbers.
-3. **Guessed causes.** `ErrorModel` without `with_why` renders an explicit
-   "cause undetermined" line. That honesty beats a plausible fiction.
-4. **Invented schemas.** If you find yourself reshaping application data to
-   fit Sartorial types for *machine* output, stop: present a projection for
-   humans, serialize the original for machines.
+Use the matching output helper for each format:
+
+- Human or plain results: `SartorialOutput::print_result` → stdout.
+- Markdown: `SartorialOutput::print_markdown` → stdout.
+- Progress and diagnostics: `print_progress` / `print_diagnostic` → stderr.
+- Supported Sartorial JSON: `print_agent_json` → stdout (`wire` feature).
+
+The helpers reject a Markdown or Agent context passed to `print_result`,
+rather than silently changing its format. Agent-mode progress and diagnostic
+prose is suppressed. Application-owned machine JSON remains the application's
+responsibility.
+
+## Capabilities, pipes, and motion
+
+Core rendering consumes explicit capabilities and does not probe the process
+environment. In the full crate, `RenderContext::detect()` captures the
+environment for result rendering. It reads stdout's TTY state for result
+style and layout. Live progress is written to stderr and checks stderr's TTY
+when it starts; this lets piped results remain clean while an attended
+terminal can still show progress.
+
+Plain, Markdown, and Agent targets are static: no ANSI colour and no motion.
+`NO_COLOR`, color choice, width, Unicode, hyperlink, motion, and interactive
+settings affect presentation capabilities; they do not alter application
+facts or schemas. Use explicit context construction or `start_live_with_tty`
+when deterministic tests need to control the environment.
+
+Unknown work uses activity progress. Known totals use real counts; percentages
+are derived. Contradictory counts and `current > total` are rejected, while a
+zero total remains indeterminate. Minimal and Numeric progress treatments
+reprint static state only when the semantic value changes.
+
+## Interaction and action keys
+
+Only show `Action` keys that the application actually handles. Otherwise omit
+the key and present the guidance as text. This keeps displayed affordances
+honest.
+
+Confirm and Choice prompts use the configured interactivity capability and
+fail closed when a terminal interaction is unavailable unless the caller
+provides an explicit non-interactive fallback. Applications own the meaning
+of accepted choices and all resulting side effects.
+
+## Optional wire protocol
+
+The `wire` feature exposes Sartorial's versioned presentation protocol
+(`sartorial.v0.1` compatibility) and agent JSON for supported Sartorial
+values. Serialized Documents use the separate
+`sartorial.document.v0.1` format. These are not application business schemas.
+
+For `--json`, serialize the application's own data directly to stdout and
+keep that output free of presentation text. Do not put human-readable progress
+or warnings on the same machine-output stream.
+
+## Examples
+
+Read the worked examples in [`crates/sartorial/examples`](../crates/sartorial/examples):
+
+- `minimal.rs` for a small static view.
+- `one_shot.rs` for target and channel selection.
+- `terrorbats.rs` for a product theme across presets, Plain, and Markdown.
+- `markdown.rs`, `progress.rs`, and `plan_receipt.rs` for their focused cases.
