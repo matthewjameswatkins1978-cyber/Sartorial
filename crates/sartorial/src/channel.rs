@@ -27,11 +27,10 @@ impl SartorialOutput {
                 item.render_plain(ctx, &mut out)
             }
             RenderTarget::Markdown => Self::print_markdown(item, ctx),
-            RenderTarget::Agent => {
-                // Agent mode should use print_agent_json directly
-                let mut out = io::stdout();
-                item.render_plain(ctx, &mut out)
-            }
+            RenderTarget::Agent => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "agent target requires print_agent_json; refusing to emit prose to stdout",
+            )),
         }
     }
 
@@ -76,6 +75,10 @@ impl SartorialOutput {
     where
         T: RenderHuman + RenderPlain,
     {
+        // Machine output must remain presentation-noise free on both streams.
+        if ctx.target.is_agent() {
+            return Ok(());
+        }
         match ctx.target {
             RenderTarget::Human => {
                 let mut err = anstream::stderr();
