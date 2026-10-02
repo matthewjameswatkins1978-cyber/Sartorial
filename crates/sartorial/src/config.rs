@@ -215,8 +215,15 @@ impl Config {
         )
     }
 
-    /// Resolves configuration into a concrete, consistent presentation authority.
-    pub fn resolve_style(&self, is_tty: bool) -> ResolvedStyle {
+    /// Resolves configuration using an explicit environment snapshot.
+    ///
+    /// This is the deterministic path used by RenderContext after detection:
+    /// no process environment is read here.
+    pub fn resolve_style_with_environment(
+        &self,
+        is_tty: bool,
+        no_color_env: bool,
+    ) -> ResolvedStyle {
         let plain_accessibility = self.accessibility.is_plain();
         let unicode = is_tty && !plain_accessibility;
         let symbols = if plain_accessibility {
@@ -224,7 +231,11 @@ impl Config {
         } else {
             self.symbols.resolve(unicode)
         };
-        let color_enabled = self.color.should_render_color(is_tty) && !plain_accessibility;
+        let color_enabled = match self.color {
+            ColorChoice::Always => true,
+            ColorChoice::Never => false,
+            ColorChoice::Auto => is_tty && !no_color_env,
+        } && !plain_accessibility;
         let theme = self.active_theme();
         ResolvedStyle::resolve(
             self.preset,
@@ -234,5 +245,11 @@ impl Config {
             symbols,
             color_enabled,
         )
+    }
+
+    /// Compatibility helper that snapshots NO_COLOR at the call site.
+    /// Prefer RenderContext for deterministic rendering.
+    pub fn resolve_style(&self, is_tty: bool) -> ResolvedStyle {
+        self.resolve_style_with_environment(is_tty, ColorChoice::no_color_env_present())
     }
 }
