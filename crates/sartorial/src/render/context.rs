@@ -129,6 +129,8 @@ impl RenderContext {
                 .interactive
                 .is_interactive(environment.stdin_is_tty, environment.stdout_is_tty),
         );
+        // Accessibility and other resolved style policy is authoritative.
+        caps.color_enabled = style.color_enabled;
 
         if static_target {
             caps.color_enabled = false;
