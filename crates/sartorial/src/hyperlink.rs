@@ -25,17 +25,29 @@ impl Hyperlink {
         }
     }
 
-    /// Format a clickable hyperlink with fallback for plain text or unsupported terminals.
-    pub fn format(text: &str, url: &str, is_tty: bool, is_plain: bool) -> String {
-        if is_plain || !is_tty {
+    /// Format using an already-resolved OSC-8 capability.
+    ///
+    /// Render paths should prefer this method with `ctx.caps.hyperlinks` so
+    /// capability detection happens once rather than being re-sniffed.
+    pub fn format_resolved(
+        text: &str,
+        url: &str,
+        is_tty: bool,
+        is_plain: bool,
+        hyperlinks_supported: bool,
+    ) -> String {
+        if is_plain || !is_tty || !hyperlinks_supported {
             return format!("{text} ({url})");
         }
 
-        if Self::is_supported() {
-            // OSC 8 escape sequence: \x1b]8;;URL\x1b\TEXT\x1b]8;;\x1b\
-            format!("\x1b]8;;{url}\x1b\\{text}\x1b]8;;\x1b\\")
-        } else {
-            format!("{text} ({url})")
-        }
+        // OSC 8 escape sequence.
+        format!("\x1b]8;;{url}\x1b\\{text}\x1b]8;;\x1b\\")
+    }
+
+    /// Backwards-compatible convenience helper that performs live detection.
+    /// New rendering code should use `format_resolved` with the capability
+    /// snapshot held by RenderContext.
+    pub fn format(text: &str, url: &str, is_tty: bool, is_plain: bool) -> String {
+        Self::format_resolved(text, url, is_tty, is_plain, Self::is_supported())
     }
 }
