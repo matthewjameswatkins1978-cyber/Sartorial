@@ -183,17 +183,19 @@ fn agent_json_identical_across_presets() {
 fn no_color_retains_structural_differences() {
     // Force TTY-true resolution so colour would normally apply, then compare
     // with and without NO_COLOR: structure identical, ANSI gone.
+    // Hermetic: ignore any ambient NO_COLOR so the "colour present" half is
+    // stable regardless of the machine running the suite.
+    let ambient = std::env::var_os("NO_COLOR");
+    std::env::remove_var("NO_COLOR");
     let style_with = Config::default()
         .with_preset(Preset::Workwear)
         .resolve_style(true);
     assert!(style_with.color_enabled);
-    let key = "SARTORIAL_NO_COLOR_TEST";
-    let prev = std::env::var_os(key.replace("SARTORIAL", "NO_COLOR"));
     std::env::set_var("NO_COLOR", "1");
     let style_without = Config::default()
         .with_preset(Preset::Workwear)
         .resolve_style(true);
-    if let Some(v) = prev {
+    if let Some(v) = ambient {
         std::env::set_var("NO_COLOR", v);
     } else {
         std::env::remove_var("NO_COLOR");
