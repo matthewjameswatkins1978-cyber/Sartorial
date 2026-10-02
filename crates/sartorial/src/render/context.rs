@@ -1,4 +1,5 @@
 use crate::config::{ColorChoice, Config};
+use crate::hyperlink::Hyperlink;
 use crate::render::target::RenderTarget;
 use sartorial_core::{Capabilities, ColorPolicy, Preset, ResolvedStyle, SymbolMode};
 use std::io::IsTerminal;
@@ -9,6 +10,38 @@ pub enum WidthCategory {
     Narrow,
     Normal,
     Wide,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct EnvironmentSnapshot {
+    stdout_is_tty: bool,
+    stdin_is_tty: bool,
+    no_color_env: bool,
+    width: usize,
+    hyperlinks: bool,
+}
+
+impl EnvironmentSnapshot {
+    fn detect() -> Self {
+        Self {
+            stdout_is_tty: std::io::stdout().is_terminal(),
+            stdin_is_tty: std::io::stdin().is_terminal(),
+            no_color_env: ColorChoice::no_color_env_present(),
+            width: detect_width(),
+            hyperlinks: Hyperlink::is_supported(),
+        }
+    }
+
+    /// Deterministic synthetic environment for tests and explicit callers.
+    fn explicit(is_tty: bool, width: usize) -> Self {
+        Self {
+            stdout_is_tty: is_tty,
+            stdin_is_tty: is_tty,
+            no_color_env: false,
+            width,
+            hyperlinks: false,
+        }
+    }
 }
 
 /// Rendering context: detected capabilities plus resolved style.
@@ -25,6 +58,7 @@ pub struct RenderContext {
     pub symbols: SymbolMode,
     pub style: ResolvedStyle,
     pub caps: Capabilities,
+    environment: EnvironmentSnapshot,
 }
 
 impl Default for RenderContext {
@@ -42,57 +76,81 @@ impl RenderContext {
     /// lets piped results stay clean while an attended terminal still
     /// animates, and vice versa.
     pub fn detect() -> Self {
-        let is_tty = std::io::stdout().is_terminal();
-        let config = Config::default();
-        Self::from_config_with_tty(config, is_tty, RenderTarget::Human)
+        let environment = EnvironmentSnapshot::detect();
+        Self::from_config_with_environment(
+            Config::default(),
+            RenderTarget::Human,
+            environment,
+        )
     }
 
     /// Build a context from explicit configuration and TTY state.
-    /// Deterministic: no environment sniffing beyond the given `is_tty`.
+    ///
+    /// This constructor is deterministic: it does not read NO_COLOR, terminal
+    /// width, stdin TTY state, hyperlink support, or any other process state.
+    /// Use detect() when live environment detection is desired.
     pub fn from_config_with_tty(config: Config, is_tty: bool, target: RenderTarget) -> Self {
-        let width = config.width.unwrap_or_else(detect_width);
-        let no_color_env = ColorChoice::no_color_env_present();
-        let style = config.resolve_style(is_tty);
-        let color_enabled = style.color_enabled;
+        let width = config.width.unwrap_or(80);
+        let environment = EnvironmentSnapshot::explicit(is_tty, width);
+        Self::from_config_with_environment(config, target, environment)
+    }
+
+    fn from_config_with_environment(
+        config: Config,
+        target: RenderTarget,
+        environment: EnvironmentSnapshot,
+    ) -> Self {
+        let width = config.width.unwrap_or(environment.width);
+        let mut style = config.resolve_style_with_environment(
+            environment.stdout_is_tty,
+            environment.no_color_env,
+        );
         let symbols = style.symbols;
-        // Unicode safety follows the resolved symbol choice: an explicit
-        // Unicode request survives non-TTY detection (tests, pipes with
-        // forced glyphs), while Auto still tracks the TTY.
         let unicode = symbols == SymbolMode::Unicode;
+        let static_target = target.is_plain() || target.is_agent() || target.is_markdown();
         let mut caps = Capabilities::explicit(
             width,
-            is_tty,
+            environment.stdout_is_tty,
             map_color_policy(config.color),
-            no_color_env,
+            environment.no_color_env,
             unicode,
-            false,
-            config.motion.should_animate(
-                is_tty,
-                target.is_agent(),
-                target.is_plain(),
-                config.accessibility.is_reduced_motion(),
-            ),
+            environment.hyperlinks,
+            if static_target {
+                false
+            } else {
+                config.motion.should_animate(
+                    environment.stdout_is_tty,
+                    false,
+                    false,
+                    config.accessibility.is_reduced_motion(),
+                )
+            },
             config
                 .interactive
-                .is_interactive(std::io::stdin().is_terminal(), is_tty),
+                .is_interactive(environment.stdin_is_tty, environment.stdout_is_tty),
         );
-        // Plain/agent targets force pipe-safe capabilities even on a TTY,
-        // so tests and redirects stay deterministic.
-        if target.is_plain() || target.is_agent() {
+        // Accessibility and other resolved style policy is authoritative.
+        caps.color_enabled = style.color_enabled;
+
+        if static_target {
             caps.color_enabled = false;
             caps.motion = false;
+            style.color_enabled = false;
         }
         if target.is_plain() {
             caps.unicode = false;
+            style.force_plain();
         }
+
         let mut ctx = Self {
             target,
             width,
             config,
-            color_enabled,
-            symbols,
+            color_enabled: style.color_enabled,
+            symbols: style.symbols,
             style,
             caps,
+            environment,
         };
         ctx.apply_target_overrides();
         ctx
@@ -106,9 +164,9 @@ impl RenderContext {
     /// Pipe-safe plain context for an explicit preset: the layout grammar
     /// (casing, markers, density) is preserved, ANSI and animation are off.
     pub fn plain_preset(preset: Preset) -> Self {
-        let is_tty = std::io::stdout().is_terminal();
+        let environment = EnvironmentSnapshot::detect();
         let config = Config::default().with_preset(preset);
-        Self::from_config_with_tty(config, is_tty, RenderTarget::Plain)
+        Self::from_config_with_environment(config, RenderTarget::Plain, environment)
     }
 
     /// Human terminal context for a preset with the default motion policy.
@@ -119,66 +177,56 @@ impl RenderContext {
     /// Human terminal context for a preset with an explicit motion policy
     /// (use `MotionMode::Never` for animation-free output and tests).
     pub fn human_motion(preset: Preset, motion: crate::motion::MotionMode) -> Self {
-        let is_tty = std::io::stdout().is_terminal();
+        let environment = EnvironmentSnapshot::detect();
         let config = Config::default().with_preset(preset).with_motion(motion);
-        Self::from_config_with_tty(config, is_tty, RenderTarget::Human)
+        Self::from_config_with_environment(config, RenderTarget::Human, environment)
     }
 
     /// Context explicitly configured for structured agent output.
     pub fn agent() -> Self {
-        let is_tty = std::io::stdout().is_terminal();
-        Self::from_config_with_tty(Config::default(), is_tty, RenderTarget::Agent)
+        let environment = EnvironmentSnapshot::detect();
+        Self::from_config_with_environment(Config::default(), RenderTarget::Agent, environment)
     }
 
     /// Markdown context for a preset: grammar preserved, no ANSI.
     pub fn markdown(preset: Preset) -> Self {
-        let is_tty = std::io::stdout().is_terminal();
+        let environment = EnvironmentSnapshot::detect();
         let config = Config::default().with_preset(preset);
-        Self::from_config_with_tty(config, is_tty, RenderTarget::Markdown)
+        Self::from_config_with_environment(config, RenderTarget::Markdown, environment)
     }
 
     /// Re-apply the invariants of the current target after any mutation.
     fn apply_target_overrides(&mut self) {
-        if self.target.is_plain() || self.target.is_agent() {
+        let static_target =
+            self.target.is_plain() || self.target.is_agent() || self.target.is_markdown();
+        if static_target {
             self.color_enabled = false;
             self.style.color_enabled = false;
             self.caps.color_enabled = false;
+            self.caps.motion = false;
         }
         if self.target.is_plain() {
             self.style.force_plain();
             self.symbols = SymbolMode::Ascii;
             self.caps.unicode = false;
         }
-        if self.target.is_agent() {
-            self.caps.motion = false;
-        }
     }
 
-    /// Set an explicit configuration.
+    /// Set an explicit configuration without re-sniffing the process environment.
     pub fn with_config(self, config: Config) -> Self {
-        let is_tty = std::io::stdout().is_terminal();
-        let target = self.target;
-        Self::from_config_with_tty(config, is_tty, target)
+        Self::from_config_with_environment(config, self.target, self.environment)
     }
 
-    /// Set an explicit target.
-    pub fn with_target(mut self, target: RenderTarget) -> Self {
-        self.target = target;
-        self.apply_target_overrides();
-        self.caps.motion = self.caps.motion && !target.is_plain() && !target.is_agent();
-        if target.is_plain() {
-            self.caps.color_enabled = false;
-            self.caps.unicode = false;
-        }
-        if target.is_agent() {
-            self.caps.color_enabled = false;
-        }
-        self
+    /// Set an explicit target by re-resolving from the original environment
+    /// snapshot. Target changes are therefore reversible and order-independent.
+    pub fn with_target(self, target: RenderTarget) -> Self {
+        Self::from_config_with_environment(self.config, target, self.environment)
     }
 
     /// Set an explicit width for testing or formatting.
     pub fn with_width(mut self, width: usize) -> Self {
         self.width = width;
+        self.config.width = Some(width);
         self.caps.width = width;
         self
     }
@@ -204,19 +252,20 @@ impl RenderContext {
 
     /// Single authority deciding whether motion/progress animation is permitted.
     pub fn should_animate(&self, is_tty: bool) -> bool {
-        if !is_tty {
+        if !is_tty
+            || self.target.is_plain()
+            || self.target.is_agent()
+            || self.target.is_markdown()
+        {
             return false;
         }
         if self.config.interactive == crate::config::InteractiveMode::Off {
             return false;
         }
         let reduced_motion = self.config.accessibility.is_reduced_motion();
-        self.config.motion.should_animate(
-            is_tty,
-            self.target.is_agent(),
-            self.target.is_plain(),
-            reduced_motion,
-        )
+        self.config
+            .motion
+            .should_animate(is_tty, false, false, reduced_motion)
     }
 }
 
