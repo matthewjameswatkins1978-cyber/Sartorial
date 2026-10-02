@@ -1,7 +1,7 @@
 use crate::render::context::RenderContext;
 #[cfg(feature = "wire")]
 use crate::render::RenderAgent;
-use crate::render::{RenderHuman, RenderMarkdown, RenderPlain, RenderTarget};
+use crate::render::{RenderHuman, RenderPlain, RenderTarget};
 use std::io;
 
 /// Output channel routing helpers ensuring standard channel hygiene:
@@ -15,7 +15,7 @@ impl SartorialOutput {
     /// Emit a primary human/plain command result to stdout.
     pub fn print_result<T>(item: &T, ctx: &RenderContext) -> io::Result<()>
     where
-        T: RenderHuman + RenderPlain + RenderMarkdown,
+        T: RenderHuman + RenderPlain,
     {
         match ctx.target {
             RenderTarget::Human => {
@@ -26,7 +26,10 @@ impl SartorialOutput {
                 let mut out = io::stdout();
                 item.render_plain(ctx, &mut out)
             }
-            RenderTarget::Markdown => Self::print_markdown(item, ctx),
+            RenderTarget::Markdown => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "markdown target requires print_markdown; refusing implicit format widening",
+            )),
             RenderTarget::Agent => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "agent target requires print_agent_json; refusing to emit prose to stdout",
