@@ -54,12 +54,17 @@ coherent while keeping each tool's decisions and contracts in its own hands.
 | Deterministic semantic model, `Document`, styles, terminal/plain/Markdown rendering | `sartorial-core` |
 | Capability detection, channels, live progress, prompts, Clap, completions, optional wire protocol | `sartorial` (re-exports core) |
 
+Until the first crates.io publication, depend on the Git repository:
+
 ```toml
 [dependencies]
-sartorial = "0.3"        # full toolkit; optional features can be trimmed
-# or
-sartorial-core = "0.3"   # deterministic presentation only
+sartorial = { git = "https://github.com/matthewjameswatkins1978-cyber/Sartorial" }
+# or, for the deterministic engine only:
+sartorial-core = { git = "https://github.com/matthewjameswatkins1978-cyber/Sartorial" }
 ```
+
+The workspace version is `0.3.0`; crates.io coordinates will become the preferred
+installation form once that version is actually published.
 
 ## Preset and Theme
 
@@ -126,7 +131,6 @@ let screen = SummaryScreen::new("MY-TOOL", Status::Ready)
 
 let context = RenderContext::human(Preset::House);
 SartorialOutput::print_result(&screen, &context)?;
-# Ok::<(), std::io::Error>(())
 ```
 
 Use a plain context when output must be safe to redirect. Markdown and agent
@@ -140,7 +144,6 @@ use sartorial::ProgressBar;
 
 let activity = ProgressBar::activity("Checking repository");
 let counted = ProgressBar::count("Scanning files", 38, 60)?;
-# Ok::<(), sartorial::ProgressError>(())
 ```
 
 Unknown totals stay indeterminate. Known totals use real counts, and
